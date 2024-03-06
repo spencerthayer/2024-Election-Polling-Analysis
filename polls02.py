@@ -13,10 +13,10 @@ grade_weights = {
 # Normalized population weights
 population_weights = {
     'lv': 1.0,
-    'rv': 0.666,
+    'rv': 0.6666666666666666,
     'v': 0.5,
-    'a': 0.333, 
-    'all': 0.333
+    'a': 0.3333333333333333,
+    'all': 0.3333333333333333
 }
 
 # Function to download and return a pandas DataFrame from a CSV URL
