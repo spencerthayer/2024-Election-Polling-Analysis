@@ -12,8 +12,11 @@ grade_weights = {
 
 # Normalized population weights
 population_weights = {
-    'lv': 1.0, 'rv': 0.6666666666666666, 'a': 0.3333333333333333, 
-    'v': 0.5, 'all': 0.3333333333333333
+    'lv': 1.0,
+    'rv': 0.666,
+    'v': 0.5,
+    'a': 0.333, 
+    'all': 0.333
 }
 
 # Function to download and return a pandas DataFrame from a CSV URL
@@ -32,11 +35,15 @@ def time_decay_weight(dates, half_life_days=30):
     decay_weights = np.exp(-np.log(2) * days_old / half_life_days)
     return decay_weights
 
-def calculate_and_print_differential(df, months_ago, half_life_days=30):
+def calculate_and_print_differential(df, period_value, period_type='months', half_life_days=30):
     df['end_date'] = pd.to_datetime(df['end_date'], format='%m/%d/%y', errors='coerce')
     filtered_df = df.dropna(subset=['end_date']).copy()
-    filtered_df = filtered_df[(filtered_df['end_date'] > (pd.Timestamp.now() - pd.DateOffset(months=months_ago))) & 
-                              (filtered_df['candidate_name'].isin(['Joe Biden', 'Donald Trump']))]
+    if period_type == 'months':
+        filtered_df = filtered_df[(filtered_df['end_date'] > (pd.Timestamp.now() - pd.DateOffset(months=period_value))) & 
+                                  (filtered_df['candidate_name'].isin(['Joe Biden', 'Donald Trump']))]
+    elif period_type == 'days':
+        filtered_df = filtered_df[(filtered_df['end_date'] > (pd.Timestamp.now() - pd.Timedelta(days=period_value))) & 
+                                  (filtered_df['candidate_name'].isin(['Joe Biden', 'Donald Trump']))]
     
     if not filtered_df.empty:
         filtered_df['time_decay_weight'] = time_decay_weight(filtered_df['end_date'], half_life_days)
@@ -53,9 +60,9 @@ def calculate_and_print_differential(df, months_ago, half_life_days=30):
         
         favored_candidate = "Biden" if differential > 0 else "Trump"
         
-        print(f"{months_ago}m {abs(differential):.2f}% {favored_candidate}")
+        print(f"{period_value}{period_type[0]} {abs(differential):.2f}% {favored_candidate}")
     else:
-        print(f"{months_ago}m: No data available for the specified period")
+        print(f"{period_value}{period_type[0]}: No data available for the specified period")
 
 if __name__ == "__main__":
     csv_url = 'https://projects.fivethirtyeight.com/polls/data/president_polls.csv'
@@ -74,5 +81,15 @@ if __name__ == "__main__":
     # Combine the weights and include time decay
     polls_df['combined_weight'] = polls_df['grade_weight'] * polls_df['transparency_weight'] * polls_df['sample_size_weight'] * polls_df['population_weight']
 
-    for months in [12, 6, 3, 1]:
-        calculate_and_print_differential(polls_df, months)
+    # Calculate and print the differentials for specified periods
+    periods = [
+        (12, 'months'),
+        (6, 'months'),
+        (3, 'months'),
+        (1, 'months'),
+        (14, 'days'),
+        (7, 'days'),
+        (2, 'days')
+        ]
+    for period_value, period_type in periods:
+        calculate_and_print_differential(polls_df, period_value, period_type)
