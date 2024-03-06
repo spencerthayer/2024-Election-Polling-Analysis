@@ -7,7 +7,7 @@ import numpy as np
 # Constants for the weighting calculations
 grade_weights = {
     'A+': 1.0, 'A': 0.9, 'A-': 0.8, 'B+': 0.7, 'B': 0.6, 'B-': 0.5,
-    'C+': 0.4, 'C': 0.3, 'C-': 0.2, 'D+': 0.1, 'D': 0.05, 'D-': 0.025, 'F': 0'
+    'C+': 0.4, 'C': 0.3, 'C-': 0.2, 'D+': 0.1, 'D': 0.05, 'D-': 0.025, 'F': 0
 }
 
 # Normalized population weights
