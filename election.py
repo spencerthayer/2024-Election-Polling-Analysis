@@ -27,7 +27,8 @@ if __name__ == "__main__":
     polls_df = download_csv_data(csv_url)
 
     # Convert 'end_date' to datetime format
-    polls_df['end_date'] = pd.to_datetime(polls_df['end_date'], errors='coerce')
+    # Convert 'end_date' to datetime with the correct format
+    polls_df['end_date'] = pd.to_datetime(polls_df['end_date'], format='%m/%d/%y', errors='coerce')
 
     # Apply the weights
     polls_df['grade_weight'] = polls_df['fte_grade'].map(grade_weights).fillna(0)
