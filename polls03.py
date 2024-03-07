@@ -6,7 +6,7 @@ from io import StringIO
 # Constants for weighting calculations
 grade_weights = {
     'A+': 1.0, 'A': 0.9, 'A-': 0.8, 'B+': 0.7, 'B': 0.6, 'B-': 0.5,
-    'C+': 0.4, 'C': 0.3, 'C-': 0.2, 'D+': 0.1, 'D': 0.05, 'D-': 0.025,
+    'C+': 0.4, 'C': 0.3, 'C-': 0.2, 'D+': 0.1, 'D': 0.05, 'D-': 0.025, 'F': 0
 }
 
 population_weights = {
@@ -17,11 +17,11 @@ population_weights = {
     'all': 0.3333333333333333
 }
 
-def time_decay_weight(dates, half_life_days=90):
-    """Calculate time decay weights based on the half-life, ensuring no NaN values."""
+# Define a function to calculate time decay weight
+half_life_days = 90
+def time_decay_weight(dates):
     reference_date = pd.Timestamp.now()
     days_old = (reference_date - dates).dt.days
-    # Ensure days_old is non-negative before calculation to avoid NaN results
     days_old = np.where(days_old < 0, 0, days_old)
     return np.exp(-np.log(2) * days_old / half_life_days)
 

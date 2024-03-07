@@ -4,6 +4,9 @@ from datetime import datetime
 from io import StringIO
 import numpy as np
 
+csv_url = 'https://projects.fivethirtyeight.com/polls/data/president_polls.csv'
+half_life_days = 30
+
 # Constants for the weighting calculations
 grade_weights = {
     'A+': 1.0, 'A': 0.9, 'A-': 0.8, 'B+': 0.7, 'B': 0.6, 'B-': 0.5,
@@ -29,13 +32,31 @@ def download_csv_data(url):
         raise Exception("Failed to download CSV data")
 
 # Define a function to calculate time decay weight
-def time_decay_weight(dates, half_life_days=30):
+def time_decay_weight(dates):
     reference_date = pd.Timestamp.now()
     days_old = (reference_date - dates).dt.days
-    decay_weights = np.exp(-np.log(2) * days_old / half_life_days)
-    return decay_weights
+    days_old = np.where(days_old < 0, 0, days_old)
+    return np.exp(-np.log(2) * days_old / half_life_days)
 
-def calculate_and_print_differential(df, period_value, period_type='months', half_life_days=30):
+def format_percentage(value):
+    # Remove unnecessary trailing zeros and avoid leading zero for numbers between -1 and 1
+    formatted_str = f"{value:.2f}".rstrip('0').rstrip('.')
+    if formatted_str.startswith('0.'):
+        return formatted_str[1:] + "%"
+    elif formatted_str.startswith('-0.'):
+        return '-' + formatted_str[2:] + "%"
+    else:
+        return formatted_str + "%"
+
+def format_differential(value):
+    # Always format the differential with a "+" sign
+    formatted_str = f"{value:.2f}".rstrip('0').rstrip('.')
+    if formatted_str == "0":  # In case the differential rounds to zero
+        return "+0"
+    else:
+        return f"+{formatted_str}"
+
+def calculate_and_print_differential(df, period_value, period_type='months'):
     df['end_date'] = pd.to_datetime(df['end_date'], format='%m/%d/%y', errors='coerce')
     filtered_df = df.dropna(subset=['end_date']).copy()
     if period_type == 'months':
@@ -46,7 +67,7 @@ def calculate_and_print_differential(df, period_value, period_type='months', hal
                                   (filtered_df['candidate_name'].isin(['Joe Biden', 'Donald Trump']))]
     
     if not filtered_df.empty:
-        filtered_df['time_decay_weight'] = time_decay_weight(filtered_df['end_date'], half_life_days)
+        filtered_df['time_decay_weight'] = time_decay_weight(filtered_df['end_date'])
         filtered_df['adjusted_combined_weight'] = filtered_df['combined_weight'] * filtered_df['time_decay_weight']
         
         weighted_sums = filtered_df.groupby('candidate_name')['pct'].apply(
@@ -60,12 +81,12 @@ def calculate_and_print_differential(df, period_value, period_type='months', hal
         
         favored_candidate = "Biden" if differential > 0 else "Trump"
         
-        print(f"{period_value}{period_type[0]} {abs(differential):.2f}% {favored_candidate}")
+        # Print statement using the simplified differential formatting
+        print(f"{period_value}{period_type[0]} B {format_percentage(biden_average)} | T {format_percentage(trump_average)} {format_differential(abs(differential))} {favored_candidate}")
     else:
         print(f"{period_value}{period_type[0]}: No data available for the specified period")
 
 if __name__ == "__main__":
-    csv_url = 'https://projects.fivethirtyeight.com/polls/data/president_polls.csv'
     polls_df = download_csv_data(csv_url)
 
     polls_df['grade_weight'] = polls_df['fte_grade'].map(grade_weights).fillna(0)
@@ -81,6 +102,7 @@ if __name__ == "__main__":
     # Combine the weights and include time decay
     polls_df['combined_weight'] = polls_df['grade_weight'] * polls_df['transparency_weight'] * polls_df['sample_size_weight'] * polls_df['population_weight']
 
+    print("Polling Over Time:")
     # Calculate and print the differentials for specified periods
     periods = [
         (12, 'months'),
