@@ -1,6 +1,5 @@
 import pandas as pd
 import requests
-
 from datetime import datetime
 from io import StringIO
 import numpy as np
@@ -31,7 +30,7 @@ grade_weights = {
 }
 
 # Define partisan weights
-partisan_weight = {True: 0.25, False: 1}
+partisan_weight = {True:0.25,False:1}
 
 # Normalized population weights
 population_weights = {
