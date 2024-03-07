@@ -5,7 +5,10 @@ from io import StringIO
 import numpy as np
 
 csv_url = 'https://projects.fivethirtyeight.com/polls/data/president_polls.csv'
+
+# Define the time decay weighting
 half_life_days = 30
+decay_rate = 0.75
 
 # Constants for the weighting calculations
 grade_weights = {
@@ -26,17 +29,8 @@ grade_weights = {
     'D-': 0.025
 }
 
-# Function to handle dual grades
-# def handle_dual_grades(grade):
-#     # Check if grade is a string and contains a '/'
-#     if isinstance(grade, str) and '/' in grade:
-#         grades = grade.split('/')
-#         weights = [grade_weights.get(g.strip(), 0) for g in grades]
-#         return np.mean(weights)
-#     elif isinstance(grade, str):
-#         return grade_weights.get(grade, 0)
-#     else:
-#         return 0
+# Define partisan weights
+partisan_weight = {True: 0.25, False: 1}
 
 # Normalized population weights
 population_weights = {
@@ -61,7 +55,8 @@ def time_decay_weight(dates):
     reference_date = pd.Timestamp.now()
     days_old = (reference_date - dates).dt.days
     days_old = np.where(days_old < 0, 0, days_old)
-    return np.exp(-np.log(2) * days_old / half_life_days)
+    # return np.exp(-np.log(2) * days_old / (half_life_days))
+    return np.exp(-np.log(1 / decay_rate) * days_old / half_life_days)
 
 def format_percentage(value):
     # Remove unnecessary trailing zeros and avoid leading zero for numbers between -1 and 1
@@ -82,17 +77,17 @@ def format_differential(value):
         return f"+{formatted_str}"
 
 def calculate_and_print_differential(df, period_value, period_type='months'):
-    df['end_date'] = pd.to_datetime(df['end_date'], format='%m/%d/%y', errors='coerce')
-    filtered_df = df.dropna(subset=['end_date']).copy()
+    df['created_at'] = pd.to_datetime(polls_df['created_at'], format='%m/%d/%y %H:%M', errors='coerce')
+    filtered_df = df.dropna(subset=['created_at']).copy()
     if period_type == 'months':
-        filtered_df = filtered_df[(filtered_df['end_date'] > (pd.Timestamp.now() - pd.DateOffset(months=period_value))) & 
+        filtered_df = filtered_df[(filtered_df['created_at'] > (pd.Timestamp.now() - pd.DateOffset(months=period_value))) & 
                                   (filtered_df['candidate_name'].isin(['Joe Biden', 'Donald Trump']))]
     elif period_type == 'days':
-        filtered_df = filtered_df[(filtered_df['end_date'] > (pd.Timestamp.now() - pd.Timedelta(days=period_value))) & 
+        filtered_df = filtered_df[(filtered_df['created_at'] > (pd.Timestamp.now() - pd.Timedelta(days=period_value))) & 
                                   (filtered_df['candidate_name'].isin(['Joe Biden', 'Donald Trump']))]
     
     if not filtered_df.empty:
-        filtered_df['time_decay_weight'] = time_decay_weight(filtered_df['end_date'])
+        filtered_df['time_decay_weight'] = time_decay_weight(filtered_df['created_at'])
         filtered_df['adjusted_combined_weight'] = filtered_df['combined_weight'] * filtered_df['time_decay_weight']
         
         weighted_sums = filtered_df.groupby('candidate_name')['pct'].apply(
@@ -113,8 +108,9 @@ def calculate_and_print_differential(df, period_value, period_type='months'):
 
 if __name__ == "__main__":
     polls_df = download_csv_data(csv_url)
+    polls_df['is_partisan'] = polls_df['partisan'].notna() & polls_df['partisan'].ne('')
+    polls_df['partisan_weight'] = polls_df['is_partisan'].map(partisan_weight)
     polls_df['grade_weight'] = polls_df['fte_grade'].map(grade_weights).fillna(0.0125)
-    # polls_df['grade_weight'] = polls_df['fte_grade'].map(handle_dual_grades).fillna(0)
     polls_df['transparency_score'] = pd.to_numeric(polls_df['transparency_score'], errors='coerce').fillna(0)
     max_transparency_score = polls_df['transparency_score'].max()
     polls_df['transparency_weight'] = polls_df['transparency_score'] / max_transparency_score
@@ -125,7 +121,7 @@ if __name__ == "__main__":
     polls_df['population_weight'] = polls_df['population'].map(lambda x: population_weights.get(x, 1))
 
     # Combine the weights and include time decay
-    polls_df['combined_weight'] = polls_df['grade_weight'] * polls_df['transparency_weight'] * polls_df['sample_size_weight'] * polls_df['population_weight']
+    polls_df['combined_weight'] = polls_df['grade_weight'] * polls_df['transparency_weight'] * polls_df['sample_size_weight'] * polls_df['population_weight'] * polls_df['partisan_weight']
 
     print("Polling Over Time:")
     # Calculate and print the differentials for specified periods
@@ -136,7 +132,8 @@ if __name__ == "__main__":
         (1, 'months'),
         (14, 'days'),
         (7, 'days'),
-        (2, 'days')
+        (3, 'days'),
+        (1, 'days')
         ]
     for period_value, period_type in periods:
         calculate_and_print_differential(polls_df, period_value, period_type)
