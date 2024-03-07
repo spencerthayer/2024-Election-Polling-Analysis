@@ -102,7 +102,13 @@ def calculate_and_print_differential(df, period_value, period_type='months'):
         favored_candidate = "Biden" if differential > 0 else "Trump"
         
         # Print statement using the simplified differential formatting
-        print(f"{period_value}{period_type[0]} B {format_percentage(biden_average)} | T {format_percentage(trump_average)} {format_differential(abs(differential))} {favored_candidate}")
+        # print(f"{period_value}{period_type[0]} B {format_percentage(biden_average)} | T {format_percentage(trump_average)} {format_differential(abs(differential))} {favored_candidate}")
+        # Combine period_value and the first character of period_type before formatting
+        combined_period = f"{period_value}{period_type[0]}"
+
+        # Then, use combined_period in your formatted string, adjusting the width as needed
+        print(f"{combined_period:<4} B {biden_average:5.2f}% | T {trump_average:5.2f}% {differential:+5.2f} {favored_candidate}")
+
     else:
         print(f"{period_value}{period_type[0]}: No data available for the specified period")
 
