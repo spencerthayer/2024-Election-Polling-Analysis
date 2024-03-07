@@ -1,6 +1,6 @@
-
 import pandas as pd
 import requests
+
 from datetime import datetime
 from io import StringIO
 import numpy as np
@@ -43,8 +43,6 @@ population_weights = {
 }
 
 # Function to download and return a pandas DataFrame from a CSV URL
-
-
 def download_csv_data(url):
     response = requests.get(url)
     if response.status_code == 200:
@@ -54,15 +52,11 @@ def download_csv_data(url):
         raise Exception("Failed to download CSV data")
 
 # Define a function to calculate time decay weight
-
-
 def time_decay_weight(dates):
     reference_date = pd.Timestamp.now()
     days_old = (reference_date - dates).dt.days
     days_old = np.where(days_old < 0, 0, days_old)
-    # return np.exp(-np.log(2) * days_old / (half_life_days))
     return np.exp(-np.log(1 / decay_rate) * days_old / half_life_days)
-
 
 def format_percentage(value):
     # Remove unnecessary trailing zeros and avoid leading zero for numbers between -1 and 1
@@ -74,7 +68,6 @@ def format_percentage(value):
     else:
         return formatted_str + "%"
 
-
 def format_differential(value):
     # Always format the differential with a "+" sign
     formatted_str = f"{value:.2f}".rstrip('0').rstrip('.')
@@ -82,7 +75,6 @@ def format_differential(value):
         return "+0"
     else:
         return f"+{formatted_str}"
-
 
 def calculate_and_print_differential(df, period_value, period_type='months'):
     df['created_at'] = pd.to_datetime(
@@ -97,11 +89,25 @@ def calculate_and_print_differential(df, period_value, period_type='months'):
 
     if not filtered_df.empty:
         filtered_df['time_decay_weight'] = time_decay_weight(filtered_df['created_at'])
-        filtered_df['adjusted_combined_weight'] = filtered_df['combined_weight'] * filtered_df['time_decay_weight']
+        filtered_df['grade_weight'] = filtered_df['fte_grade'].map(grade_weights).fillna(0.0125)
+        filtered_df['transparency_score'] = pd.to_numeric(filtered_df['transparency_score'], errors='coerce').fillna(0)
+        max_transparency_score = filtered_df['transparency_score'].max()
+        filtered_df['transparency_weight'] = filtered_df['transparency_score'] / max_transparency_score
+        min_sample_size, max_sample_size = filtered_df['sample_size'].min(), filtered_df['sample_size'].max()
+        filtered_df['sample_size_weight'] = (filtered_df['sample_size'] - min_sample_size) / (max_sample_size - min_sample_size)
+        filtered_df['population'] = filtered_df['population'].str.lower()
+        filtered_df['population_weight'] = filtered_df['population'].map(lambda x: population_weights.get(x, 1))
+        filtered_df['is_partisan'] = filtered_df['partisan'].notna() & filtered_df['partisan'].ne('')
+        filtered_df['partisan_weight'] = filtered_df['is_partisan'].map(partisan_weight)
+        
+        # Calculate the final combined weight
+        filtered_df['combined_weight'] = filtered_df['grade_weight'] * filtered_df['transparency_weight'] * \
+            filtered_df['sample_size_weight'] * \
+            filtered_df['population_weight'] * filtered_df['partisan_weight']
 
-        weighted_sums = filtered_df.groupby('candidate_name')['pct'].apply(
-            lambda x: (x * filtered_df.loc[x.index, 'adjusted_combined_weight']).sum())
-        total_weights = filtered_df.groupby('candidate_name')['adjusted_combined_weight'].sum()
+        weighted_sums = filtered_df.groupby('candidate_name')['combined_weight'].apply(
+            lambda x: (x * filtered_df.loc[x.index, 'pct']).sum())
+        total_weights = filtered_df.groupby('candidate_name')['combined_weight'].sum()
         weighted_averages = weighted_sums / total_weights
 
         biden_average = weighted_averages.get('Joe Biden', 0)
@@ -121,25 +127,6 @@ def calculate_and_print_differential(df, period_value, period_type='months'):
 
 if __name__ == "__main__":
     polls_df = download_csv_data(csv_url)
-    
-    polls_df['is_partisan'] = polls_df['partisan'].notna() & polls_df['partisan'].ne('')
-    polls_df['partisan_weight'] = polls_df['is_partisan'].map(partisan_weight)
-    
-    polls_df['grade_weight'] = polls_df['fte_grade'].map(grade_weights).fillna(0.0125)
-    polls_df['transparency_score'] = pd.to_numeric(polls_df['transparency_score'], errors='coerce').fillna(0)
-    max_transparency_score = polls_df['transparency_score'].max()
-    polls_df['transparency_weight'] = polls_df['transparency_score'] / max_transparency_score
-
-    min_sample_size, max_sample_size = polls_df['sample_size'].min(), polls_df['sample_size'].max()
-    polls_df['sample_size_weight'] = (polls_df['sample_size'] - min_sample_size) / (max_sample_size - min_sample_size)
-    polls_df['population'] = polls_df['population'].str.lower()
-    polls_df['population_weight'] = polls_df['population'].map(lambda x: population_weights.get(x, 1))
-
-    # Combine the weights and include time decay
-    polls_df['combined_weight'] = polls_df['grade_weight'] * polls_df['transparency_weight'] * \
-        polls_df['sample_size_weight'] * \
-        polls_df['population_weight'] * polls_df['partisan_weight']
-
     print("Polling Over Time:")
     # Calculate and print the differentials for specified periods
     periods = [
