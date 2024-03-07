@@ -129,11 +129,12 @@ if __name__ == "__main__":
     print("Polling Over Time:")
     # Calculate and print the differentials for specified periods
     periods = [
-        (12, 'months'),
+        (12,'months'),
         (6, 'months'),
         (3, 'months'),
         (1, 'months'),
-        (14, 'days'),
+        (21,'days'),
+        (14,'days'),
         (7, 'days'),
         (3, 'days'),
         (1, 'days')
