@@ -10,8 +10,20 @@ half_life_days = 30
 # Constants for the weighting calculations
 grade_weights = {
     'A+': 1.0, 'A': 0.9, 'A-': 0.8, 'B+': 0.7, 'B': 0.6, 'B-': 0.5,
-    'C+': 0.4, 'C': 0.3, 'C-': 0.2, 'D+': 0.1, 'D': 0.05, 'D-': 0.025, 'F': 0
+    'C+': 0.4, 'C': 0.3, 'C-': 0.2, 'D+': 0.1, 'D': 0.05, 'D-': 0.025
 }
+
+# Function to handle dual grades
+def handle_dual_grades(grade):
+    # Check if grade is a string and contains a '/'
+    if isinstance(grade, str) and '/' in grade:
+        grades = grade.split('/')
+        weights = [grade_weights.get(g.strip(), 0) for g in grades]
+        return np.mean(weights)
+    elif isinstance(grade, str):
+        return grade_weights.get(grade, 0)
+    else:
+        return 0
 
 # Normalized population weights
 population_weights = {
@@ -89,7 +101,8 @@ def calculate_and_print_differential(df, period_value, period_type='months'):
 if __name__ == "__main__":
     polls_df = download_csv_data(csv_url)
 
-    polls_df['grade_weight'] = polls_df['fte_grade'].map(grade_weights).fillna(0)
+    # polls_df['grade_weight'] = polls_df['fte_grade'].map(grade_weights).fillna(0)
+    polls_df['grade_weight'] = polls_df['fte_grade'].map(handle_dual_grades).fillna(0)
     polls_df['transparency_score'] = pd.to_numeric(polls_df['transparency_score'], errors='coerce').fillna(0)
     max_transparency_score = polls_df['transparency_score'].max()
     polls_df['transparency_weight'] = polls_df['transparency_score'] / max_transparency_score
