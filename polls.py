@@ -130,7 +130,6 @@ def calculate_and_print_differential(df, period_value, period_type='months', per
 
         combined_period = f"{period_value}{period_type[0]}"
 
-        # print(f"{combined_period:<4} B {biden_average:5.2f}% | T {trump_average:5.2f}% {abs(differential):+5.2f} {favored_candidate}")
         color_code = get_color_code(period_index, total_periods)
         if period_type == 'months':
             # Use a different color range or logic for months, if needed
