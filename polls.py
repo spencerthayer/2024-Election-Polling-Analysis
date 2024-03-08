@@ -6,13 +6,13 @@ import numpy as np
 
 csv_url = 'https://projects.fivethirtyeight.com/polls/data/president_polls.csv'
 
-# Define the time decay weighting
-decay_rate = 0.5
-half_life_days = 30
-
 # Coloring
 start_color = 200
 total_color_count = 5
+
+# Define the time decay weighting
+decay_rate = 0.25
+half_life_days = 30
 
 # Constants for the weighting calculations
 grade_weights = {
@@ -31,10 +31,13 @@ grade_weights = {
     'D+': 0.1,
     'D': 0.05,
     'D-': 0.025
-}
+    }
 
 # Define partisan weights
-partisan_weight = {True:0.25,False:1}
+partisan_weight = {
+    True:0.25,
+    False:1
+    }
 
 # Normalized population weights
 population_weights = {
@@ -43,7 +46,7 @@ population_weights = {
     'v': 0.5,
     'a': 0.3333333333333333,
     'all': 0.3333333333333333
-}
+    }
 
 # Function to download and return a pandas DataFrame from a CSV URL
 def download_csv_data(url):
@@ -55,11 +58,11 @@ def download_csv_data(url):
         raise Exception("Failed to download CSV data")
 
 # Define a function to calculate time decay weight
-def time_decay_weight(dates):
+def time_decay_weight(dates, decay_rate, half_life_days):
     reference_date = pd.Timestamp.now()
     days_old = (reference_date - dates).dt.days
-    days_old = np.where(days_old < 0, 0, days_old)
-    return np.exp(-np.log(1 / decay_rate) * days_old / half_life_days)
+    # Ensuring the decay_rate is factored into the calculation
+    return np.exp(-np.log(decay_rate) * days_old / half_life_days)
 
 def format_percentage(value):
     # Remove unnecessary trailing zeros and avoid leading zero for numbers between -1 and 1
@@ -78,8 +81,6 @@ def format_differential(value):
         return "+0"
     else:
         return f"+{formatted_str}"
-    
-    
 
 def get_color_code(period_index, total_periods):
     # Define the color range for cyan to white gradient
@@ -100,7 +101,8 @@ def calculate_and_print_differential(df, period_value, period_type='months', per
                                   (filtered_df['candidate_name'].isin(['Joe Biden', 'Donald Trump']))]
 
     if not filtered_df.empty:
-        filtered_df['time_decay_weight'] = time_decay_weight(filtered_df['created_at'])
+        # filtered_df['time_decay_weight'] = time_decay_weight(filtered_df['created_at'])
+        filtered_df['time_decay_weight'] = time_decay_weight(filtered_df['created_at'], decay_rate, half_life_days)
         filtered_df['grade_weight'] = filtered_df['fte_grade'].map(grade_weights).fillna(0.0125)
         filtered_df['transparency_score'] = pd.to_numeric(filtered_df['transparency_score'], errors='coerce').fillna(0)
         max_transparency_score = filtered_df['transparency_score'].max()
@@ -113,12 +115,9 @@ def calculate_and_print_differential(df, period_value, period_type='months', per
         filtered_df['partisan_weight'] = filtered_df['is_partisan'].map(partisan_weight)
         
         # Calculate the final combined weight
-        filtered_df['combined_weight'] = filtered_df['grade_weight'] * filtered_df['transparency_weight'] * \
-            filtered_df['sample_size_weight'] * \
-            filtered_df['population_weight'] * filtered_df['partisan_weight']
+        filtered_df['combined_weight'] = (filtered_df['time_decay_weight'] * filtered_df['grade_weight'] * filtered_df['transparency_weight'] * filtered_df['sample_size_weight'] * filtered_df['population_weight'] * filtered_df['partisan_weight'])
 
-        weighted_sums = filtered_df.groupby('candidate_name')['combined_weight'].apply(
-            lambda x: (x * filtered_df.loc[x.index, 'pct']).sum())
+        weighted_sums = filtered_df.groupby('candidate_name')['combined_weight'].apply(lambda x: (x * filtered_df.loc[x.index, 'pct']).sum())
         total_weights = filtered_df.groupby('candidate_name')['combined_weight'].sum()
         weighted_averages = weighted_sums / total_weights
 
@@ -148,8 +147,7 @@ def calculate_and_print_differential(df, period_value, period_type='months', per
 
 if __name__ == "__main__":
     polls_df = download_csv_data(csv_url)
-    print("Polling Over Time:")
-    # Define periods here or ensure it's defined before referencing
+    print("Decay: " + str(decay_rate) + " " + "Halflife: " + str(half_life_days))
     periods = [
         (24, 'months'),
         (18, 'months'),
@@ -166,61 +164,3 @@ if __name__ == "__main__":
     total_periods = len(periods)
     for index, (period_value, period_type) in enumerate(periods):
         calculate_and_print_differential(polls_df, period_value, period_type, index, total_periods)
-
-# if __name__ == "__main__":
-#     polls_df = download_csv_data(csv_url)
-#     print("Polling Over Time:")
-
-#     # Extract a sample of dates from the dataset
-#     sample_dates = polls_df['created_at'].sample(n=200, random_state=1)
-#     sample_dates = pd.to_datetime(sample_dates, format='%m/%d/%y %H:%M', errors='coerce')
-
-#     # Initial parameters
-#     decay_rate = 0.5
-#     half_life_days = 30
-
-#     # Calculate initial time decay weights
-#     initial_weights = time_decay_weight(sample_dates)
-#     print("Initial time decay weights with decay_rate=0.5 and half_life_days=30:")
-#     print(initial_weights)
-#     periods = [
-#         (24, 'months'),
-#         (18, 'months'),
-#         (12, 'months'),
-#         (6, 'months'),
-#         (3, 'months'),
-#         (1, 'months'),
-#         (21, 'days'),
-#         (14, 'days'),
-#         (7, 'days'),
-#         (3, 'days'),
-#         (1, 'days')
-#     ]
-#     total_periods = len(periods)
-#     for index, (period_value, period_type) in enumerate(periods):
-#         calculate_and_print_differential(polls_df, period_value, period_type, index, total_periods)
-
-#     # Change parameters
-#     decay_rate = 1  # or any other value you wish to test
-#     half_life_days = 300  # or any other value you wish to test
-
-#     # Calculate new time decay weights with updated parameters
-#     new_weights = time_decay_weight(sample_dates)
-#     print("\nNew time decay weights with updated parameters (decay_rate=1 and half_life_days=300):")
-#     print(new_weights)
-#     periods = [
-#         (24, 'months'),
-#         (18, 'months'),
-#         (12, 'months'),
-#         (6, 'months'),
-#         (3, 'months'),
-#         (1, 'months'),
-#         (21, 'days'),
-#         (14, 'days'),
-#         (7, 'days'),
-#         (3, 'days'),
-#         (1, 'days')
-#     ]
-#     total_periods = len(periods)
-#     for index, (period_value, period_type) in enumerate(periods):
-#         calculate_and_print_differential(polls_df, period_value, period_type, index, total_periods)
