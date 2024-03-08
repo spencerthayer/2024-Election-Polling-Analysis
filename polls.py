@@ -7,8 +7,12 @@ import numpy as np
 csv_url = 'https://projects.fivethirtyeight.com/polls/data/president_polls.csv'
 
 # Define the time decay weighting
-half_life_days = 30
 decay_rate = 0.5
+half_life_days = 30
+
+# Coloring
+start_color = 200
+total_color_count = 5
 
 # Constants for the weighting calculations
 grade_weights = {
@@ -76,11 +80,9 @@ def format_differential(value):
         return f"+{formatted_str}"
     
     
-total_color_count = 9
 
 def get_color_code(period_index, total_periods):
     # Define the color range for cyan to white gradient
-    start_color = 198
     end_color = start_color + (total_color_count)
     color_step = (start_color - end_color)
     return int(start_color - color_step * period_index)
@@ -145,11 +147,71 @@ def calculate_and_print_differential(df, period_value, period_type='months', per
             f"{period_value}{period_type[0]}: No data available for the specified period")
 
 
+# if __name__ == "__main__":
+#     polls_df = download_csv_data(csv_url)
+#     print("Polling Over Time:")
+#     # Define periods here or ensure it's defined before referencing
+#     periods = [
+#         (24, 'months'),
+#         (18, 'months'),
+#         (12, 'months'),
+#         (6, 'months'),
+#         (3, 'months'),
+#         (1, 'months'),
+#         (21, 'days'),
+#         (14, 'days'),
+#         (7, 'days'),
+#         (3, 'days'),
+#         (1, 'days')
+#     ]
+#     total_periods = len(periods)
+#     for index, (period_value, period_type) in enumerate(periods):
+#         calculate_and_print_differential(polls_df, period_value, period_type, index, total_periods)
+
 if __name__ == "__main__":
     polls_df = download_csv_data(csv_url)
     print("Polling Over Time:")
-    # Define periods here or ensure it's defined before referencing
+
+    # Extract a sample of dates from the dataset
+    sample_dates = polls_df['created_at'].sample(n=200, random_state=1)
+    sample_dates = pd.to_datetime(sample_dates, format='%m/%d/%y %H:%M', errors='coerce')
+
+    # Initial parameters
+    decay_rate = 0.5
+    half_life_days = 30
+
+    # Calculate initial time decay weights
+    initial_weights = time_decay_weight(sample_dates)
+    print("Initial time decay weights with decay_rate=0.5 and half_life_days=30:")
+    print(initial_weights)
     periods = [
+        (24, 'months'),
+        (18, 'months'),
+        (12, 'months'),
+        (6, 'months'),
+        (3, 'months'),
+        (1, 'months'),
+        (21, 'days'),
+        (14, 'days'),
+        (7, 'days'),
+        (3, 'days'),
+        (1, 'days')
+    ]
+    total_periods = len(periods)
+    for index, (period_value, period_type) in enumerate(periods):
+        calculate_and_print_differential(polls_df, period_value, period_type, index, total_periods)
+
+    # Change parameters
+    decay_rate = 1  # or any other value you wish to test
+    half_life_days = 300  # or any other value you wish to test
+
+    # Calculate new time decay weights with updated parameters
+    new_weights = time_decay_weight(sample_dates)
+    print("\nNew time decay weights with updated parameters (decay_rate=1 and half_life_days=300):")
+    print(new_weights)
+    periods = [
+        (24, 'months'),
+        (18, 'months'),
         (12, 'months'),
         (6, 'months'),
         (3, 'months'),
