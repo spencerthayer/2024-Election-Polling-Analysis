@@ -87,7 +87,7 @@ def get_color_code(period_index, total_periods):
     color_step = (start_color - end_color)
     return int(start_color - color_step * period_index)
 
-# def calculate_and_print_differential(df, period_value, period_type='months'):
+# # # I N S E R T # # #
 def calculate_and_print_differential(df, period_value, period_type='months', period_index=0, total_periods=1):
     df['created_at'] = pd.to_datetime(
         polls_df['created_at'], format='%m/%d/%y %H:%M', errors='coerce')
@@ -145,6 +145,7 @@ def calculate_and_print_differential(df, period_value, period_type='months', per
     else:
         print(
             f"{period_value}{period_type[0]}: No data available for the specified period")
+# # # I N S E R T # # #
 
 if __name__ == "__main__":
     polls_df = download_csv_data(csv_url)
