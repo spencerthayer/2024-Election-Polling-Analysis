@@ -74,8 +74,19 @@ def format_differential(value):
         return "+0"
     else:
         return f"+{formatted_str}"
+    
+    
+total_color_count = 9
 
-def calculate_and_print_differential(df, period_value, period_type='months'):
+def get_color_code(period_index, total_periods):
+    # Define the color range for cyan to white gradient
+    start_color = 198
+    end_color = start_color + (total_color_count)
+    color_step = (start_color - end_color)
+    return int(start_color - color_step * period_index)
+
+# def calculate_and_print_differential(df, period_value, period_type='months'):
+def calculate_and_print_differential(df, period_value, period_type='months', period_index=0, total_periods=1):
     df['created_at'] = pd.to_datetime(
         polls_df['created_at'], format='%m/%d/%y %H:%M', errors='coerce')
     filtered_df = df.dropna(subset=['created_at']).copy()
@@ -117,7 +128,17 @@ def calculate_and_print_differential(df, period_value, period_type='months'):
 
         combined_period = f"{period_value}{period_type[0]}"
 
-        print(f"{combined_period:<4} B {biden_average:5.2f}% | T {trump_average:5.2f}% {abs(differential):+5.2f} {favored_candidate}")
+        # print(f"{combined_period:<4} B {biden_average:5.2f}% | T {trump_average:5.2f}% {abs(differential):+5.2f} {favored_candidate}")
+        color_code = get_color_code(period_index, total_periods)
+        if period_type == 'months':
+            # Use a different color range or logic for months, if needed
+            color_code = get_color_code(period_index, total_color_count)  # Adjusting for the 9 month periods
+        elif period_type == 'days':
+            # Use a different color range or logic for days, if needed
+            color_code = get_color_code(period_index - total_color_count, total_periods - total_color_count)  # Adjusting for the day periods starting after months
+        
+        # Modify your print statement to include the ANSI escape code for color
+        print(f"\033[38;5;{color_code}m{combined_period:<4} B {biden_average:5.2f}% | T {trump_average:5.2f}% {abs(differential):+5.2f} {favored_candidate}\033[0m")
 
     else:
         print(
@@ -127,17 +148,18 @@ def calculate_and_print_differential(df, period_value, period_type='months'):
 if __name__ == "__main__":
     polls_df = download_csv_data(csv_url)
     print("Polling Over Time:")
-    # Calculate and print the differentials for specified periods
+    # Define periods here or ensure it's defined before referencing
     periods = [
-        (12,'months'),
+        (12, 'months'),
         (6, 'months'),
         (3, 'months'),
         (1, 'months'),
-        (21,'days'),
-        (14,'days'),
+        (21, 'days'),
+        (14, 'days'),
         (7, 'days'),
         (3, 'days'),
         (1, 'days')
     ]
-    for period_value, period_type in periods:
-        calculate_and_print_differential(polls_df, period_value, period_type)
+    total_periods = len(periods)
+    for index, (period_value, period_type) in enumerate(periods):
+        calculate_and_print_differential(polls_df, period_value, period_type, index, total_periods)
