@@ -23,7 +23,9 @@ $$ t = \text{Current Date} - \text{Poll Conduct Date} $$
 ### 2. Grade Weights Calculation
 Polls are weighted based on the grade assigned to the polling organization, which reflects their historical accuracy and methodology quality. FiveThirtyEight categorizes these grades, and in our script, each grade is associated with a specific numerical weight. This numerical weight translates the qualitative assessment of a poll’s reliability into a quantitative factor that can be used in further calculations. The mapping from grades to numerical weights is as follows:
 
-> A+: 1.0, A: 0.9, A-: 0.8,A/B: 0.75, B+: 0.7; B: 0.6, B-: 0.5, B/C: 0.45, C+: 0.4, C: 0.3, C-: 0.2, C/D: 0.15, D+: 0.1, D: 0.05, D-: 0.025, `null`: 0.0125
+```
+A+: 1.0, A: 0.9, A-: 0.8,A/B: 0.75, B+: 0.7; B: 0.6, B-: 0.5, B/C: 0.45, C+: 0.4, C: 0.3, C-: 0.2, C/D: 0.15, D+: 0.1, D: 0.05, D-: 0.025, `null`: 0.0125
+```
 
 Each grade is assigned a weight that diminishes as the grade decreases, with ‘A+’ polls being considered the most reliable (and thus given a weight of 1.0) and ‘D-’ polls being considered the least reliable (with a weight of 0.025). This numerical representation of grades allows for a standardized and objective approach to adjust the impact of each poll based on the credibility and track record of the polling organization.
 
