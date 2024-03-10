@@ -12,7 +12,7 @@ start_color = 200
 total_color_count = 5
 
 # Define the time decay weighting
-decay_rate = 0.25
+decay_rate = 0.5
 half_life_days = 30
 
 # Constants for the weighting calculations
