@@ -161,7 +161,7 @@ def calculate_and_print_differential(df, period_value, period_type='months', per
 
 if __name__ == "__main__":
     polls_df = download_csv_data(csv_url)
-    print("Decay: " + str(decay_rate) + " over " + str(half_life_days) + " days.")
+    # print("Decay: " + str(decay_rate) + " over " + str(half_life_days) + " days.")
     periods = [
         (24, 'months'),
         (18, 'months'),
