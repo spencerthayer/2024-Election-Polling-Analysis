@@ -56,10 +56,11 @@ if response.status_code == 200:
                     # Look up the integer value for pro_status
                     pro_status_value = pro_values.get(pro_status_code, None)
                     # Normalize the electoral votes
-                    normalized_e_votes = (e_votes - min_votes) / (max_votes - min_votes)
-                    # normalized_e_votes = e_votes / electoral_total
+                    # normalized_e_votes = (e_votes - min_votes) / (max_votes - min_votes)
+                    normalized_e_votes = e_votes / electoral_total
                     state_rank = pro_status_value + normalized_e_votes
                     seat_details = {
+                        'e': e_votes,
                         'code': pro_status_code,
                         'bias': pro_status_value,
                         'electoral': normalized_e_votes,
