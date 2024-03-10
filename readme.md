@@ -1,10 +1,17 @@
 # Election Polling Analysis
+
 This Python script is designed to fetch, process, and analyze presidential polling data. Using data from FiveThirtyEight's publicly available [CSV file](https://projects.fivethirtyeight.com/polls/data/president_polls.csv), it applies a series of weightings to adjust for various factors such as poll quality, partisanship, and sample population type.
+
 ## Data Acquisition
+
 The script fetches polling data using the Python `Requests` library. The data is then loaded into a `Pandas` DataFrame for analysis. This approach ensures that the analysis is always up-to-date with the latest available data.
+
 ## Weighting Calculations
+
 The script employs several mathematical principles to calculate the final weight of each poll. Below we will explore how these weights are derived and applied to the polling data to calculate the adjusted polls which should result in a nuanced analysis of polling data.
+
 ### 1. Time Weights
+
 The weight of a poll decreases exponentially based on how long ago it was conducted, underpinning the principle that more recent polls are more reflective of the current state of public opinion.
 
 $$ w(t) = e^{-\lambda \cdot t} $$
@@ -50,14 +57,17 @@ This is formalized as $W_{population}(P)$ where $P$ stands for the population ty
 ### 5. Combining Weights
 After calculating individual weights, the combined weight of a poll is given by:
 
-$$ W_{combined} = (W_{grade} \times W_{partisan} \times W_{population})
-\times {w(t)} $$
+$$ W_{combined} = W_{grade} \times W_{partisan} \times W_{population} \times {w(t)} $$
 
 This formula incorporates the time decay weight and multiplies it against the polls grade, partisan, and population weights.
 ### 6. Normalization
 The normalization process ensures that the sum of weights across all polls equals 1, allowing for a fair comparison and aggregation:
 
-$$ W_{normalized,i} = \frac{W_{combined,i}}{\sum_{j=1}^{N} W_{combined,j}} $$
+$$
+W_{normalized,i} =
+\frac{W_{combined,i}}
+{\sum_{j=1}^{N} W_{combined,j}}
+$$
 
 - $W_{normalized,i}$: Normalized weight of the $i$th poll.
 - $W_{combined,i}$: Combined weight of the $i$th poll before normalization.
@@ -71,12 +81,15 @@ Finally, to calculate adjusted poll results, each poll's result is multiplied by
 $$ \text{Adjusted Result} = \sum_{i=1}^{N} (W_{normalized,i} \times \text{Poll Result}_i) $$
 
 This formula ensures that polls which are more recent, from higher-grade organizations, non-partisan, and targeting more reliable population samples have a greater influence on the adjusted result.
+
 ## State Polling Considerations
 I am struggling to determine the best methodology for incorporating state-specific polls into a broader analysis. Currently state-specific polling is influencing the broader analysis with out weighting or normalization which is less than ideal.
 
 Incorporating state-specific polls into a broader analysis requires a careful balance between representing the unique political landscape of each state and maintaining a coherent overall picture. The strategies below are my thoughts on how to manage the complexity and variability of state-specific data to produce more accurate and meaningful analyses.
+
 ### State vs. National Polls
 Balancing the input of state-specific and national polls in analyses aimed at predicting outcomes in electoral systems, like the U.S. presidential election, requires nuanced strategies. National polls offer a broad overview of voter sentiment across the entire country, while state-specific polls provide detailed insights into the political landscape of individual states. The integration of these polls must carefully mitigate the potential skew introduced by state-specific biases to maintain a coherent and accurate overall analysis.
+
 #### Weighting Based on Electoral Votes or Population
 
 When incorporating state-specific polls into broader analyses, one crucial aspect is to adjust the influence of each state's polls based on its electoral or demographic significance. This can be achieved through normalization, ensuring that states with larger populations or more electoral votes do not overshadow those with fewer.
@@ -92,6 +105,7 @@ When incorporating state-specific polls into broader analyses, one crucial aspec
    - $EV_{total}$: The sum of electoral votes or the total population size of all states considered in the analysis. This total provides the basis for calculating each state's proportional influence. By dividing the individual state's electoral votes or population by this total, we obtain a normalized weight that fairly represents the state's significance relative to the entire country.
 
 This normalization process ensures that the analysis reflects the distribution of electoral power or population across the country, making it possible to integrate state-specific insights into a national context without disproportionate influence from more populous or electorally significant states.
+
 ##### Python Example
 
 To put these concepts into practice, here's an example of how you might calculate and apply these normalized weights in Python, considering both electoral votes and population data:
@@ -114,7 +128,9 @@ print("Normalized Population Sizes:", normalized_population)
 ```
 
 This example demonstrates calculating normalized weights for states based on their electoral votes and population sizes. Such weights can then be integrated into broader analyses to balance the influence of state-specific and national polls, reflecting the nuanced landscape of voter sentiment and electoral significance across the United States.
+
 #### Weights based on Demographics 
+
 Adjusting for demographic factors involves considering the unique characteristics of each state's population that might influence voting behavior. These characteristics include age distribution, racial and ethnic composition, education levels, and economic status. The goal is to quantify these factors in a way that allows their impact to be integrated into the analysis.
 
 To incorporate demographic factors into the weighting of state-specific polls, you can calculate a demographic score for each state based on key demographic indicators. This score reflects the potential influence of the state's demographic makeup on its voting behavior.
@@ -136,6 +152,7 @@ The weight adjustment for demographic factors $W_{demographic}$ can be expressed
    - $\alpha$, $\beta$, $\gamma$, $\delta$: These are coefficients that represent the relative importance or influence of each demographic factor on voting behavior. The values of these coefficients can be determined based on historical data analysis, expert opinions, or statistical modeling.
 
    The resulting $W_{demographic}$ provides a numerical value that adjusts the weight of each state's polls based on its demographic profile, allowing the analysis to account for demographic influences on electoral outcomes.
+
 ##### Python Example
 
 To implement these adjustments, you first need to define the scores for each demographic factor and then calculate the weighted demographic score for each state:
@@ -160,6 +177,7 @@ print("Weighted Demographic Scores:", W_demographic)
 ```
 
 This Python example calculates a weighted demographic score for each state by aggregating the scores of individual demographic factors, each weighted by its relative importance. This approach allows demographic adjustments to be seamlessly integrated into the broader analysis, ensuring that the unique demographic landscape of each state is appropriately considered.
+
 #### Historical Voting Trend Adjustments
 
 Adjusting for historical voting trends involves accounting for each state's voting history, such as its tendency to vote for a particular political party in past elections. This historical perspective can provide valuable insights into potential voting behavior in future elections.
@@ -173,6 +191,7 @@ Each state is assigned a historical trend score based on its voting patterns in 
    - $H_{avg}$: The average historical trend score across all states, serving as a baseline for comparison.
 
    This formula adjusts each state's weight by increasing or decreasing it based on how its historical voting behavior compares to the national average. States with a history of strongly favoring one party might see their weight adjusted to reflect the potential for continued patterned voting behavior.
+
 ##### Python Example
 
 To apply these historical adjustments, you would first define the historical trend scores for each state and then calculate the adjustment for each based on the average trend score:
@@ -194,6 +213,7 @@ print("Historical Adjustments:", W_historical)
 ```
 
 This Python code calculates the historical adjustment for each state by comparing its historical trend score to the national average. The adjustment is then scaled by a sensitivity factor, $\lambda$, which controls the extent to which historical trends influence the overall weighting. This method ensures that the unique electoral history of each state is factored into the analysis, providing a more nuanced understanding of potential voting outcomes.
+
 ### Reflections on State Weighting and Next Steps
 
 Crafting a robust methodology to integrate state-specific polling into broader analyses indeed presents complex challenges. While progress has been made, there's room for further refinement and collaboration. I invite the community to contribute through pull requests, offering insights or adjustments that could enhance the solution to effectively balance state polling within national contexts.
