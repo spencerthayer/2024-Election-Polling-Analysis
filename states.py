@@ -11,15 +11,15 @@ electoral_total = 538
 response = requests.get(url)
 
 pro_values = {
-    'T' : 1,
-    'D1': 0.75,
-    'D2': 0.5,
-    'D3': 0.25,
-    'D4': 0.125,
-    'R1': 0.75,
-    'R2': 0.5,
-    'R3': 0.25,
-    'R4': 0.125
+    'T' : 0.8,
+    'D1': 0.6,
+    'D2': 0.4,
+    'D3': 0.2,
+    'D4': 0,
+    'R1': 0.6,
+    'R2': 0.4,
+    'R3': 0.2,
+    'R4': 0
 }
 
 # Initialize variables to hold the max and min electoral vote counts
@@ -60,9 +60,9 @@ if response.status_code == 200:
                     # normalized_e_votes = e_votes / electoral_total
                     state_rank = pro_status_value + normalized_e_votes
                     seat_details = {
-                        # 'code': pro_status_code,
-                        # 'bias': pro_status_value,
-                        # 'electoral': normalized_e_votes,
+                        'code': pro_status_code,
+                        'bias': pro_status_value,
+                        'electoral': normalized_e_votes,
                         'rank': state_rank
                     }
                     processed_data.setdefault(state_name,[]).append(seat_details)
