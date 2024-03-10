@@ -11,15 +11,15 @@ electoral_total = 538
 response = requests.get(url)
 
 pro_values = {
-    'T' : 0.8,
-    'D1': 0.6,
-    'D2': 0.4,
-    'D3': 0.2,
-    'D4': 0,
-    'R1': 0.6,
-    'R2': 0.4,
-    'R3': 0.2,
-    'R4': 0
+    'T' : 0.9,  # Swing State
+    'D1': 0.6,  # Tilts Democrat
+    'D2': 0.3,  # Leans Democrat
+    'D3': 0.1,  # Likely Democrat
+    'D4': 0,    # Safe Democrat
+    'R1': 0.6,  # Tilts Republican
+    'R2': 0.3,  # Leans Republican
+    'R3': 0.1,  # Likely Republican
+    'R4': 0     # Safe Republican
 }
 
 # Initialize variables to hold the max and min electoral vote counts
