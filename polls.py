@@ -130,7 +130,7 @@ def calculate_and_print_differential(df, period_value, period_type='months', per
             * filtered_df['sample_size_weight'] \
             * filtered_df['population_weight'] \
             * filtered_df['partisan_weight'] \
-            * filtered_df['state_rank'] 
+            * filtered_df['state_rank']
 
         weighted_sums = filtered_df.groupby('candidate_name')['combined_weight'].apply(lambda x: (x * filtered_df.loc[x.index, 'pct']).sum())
         total_weights = filtered_df.groupby('candidate_name')['combined_weight'].sum()
