@@ -5,22 +5,22 @@ import re
 
 def get_state_data():
     # URL of the page to scrape
-    url = 'https://www.270towin.com/'
+    mapurl = 'https://www.270towin.com/'
     electoral_total = 538
 
     # Send a GET request to the page
-    response = requests.get(url)
+    response = requests.get(mapurl)
 
     pro_values = {
         'T' : 0.8,
         'D1': 0.6,
         'D2': 0.4,
         'D3': 0.2,
-        'D4': 0,
+        'D4': 0.05,
         'R1': 0.6,
         'R2': 0.4,
         'R3': 0.2,
-        'R4': 0
+        'R4': 0.05
     }
 
     # Initialize variables to hold the max and min electoral vote counts
