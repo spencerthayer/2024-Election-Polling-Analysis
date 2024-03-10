@@ -3,6 +3,7 @@ import requests
 from datetime import datetime
 from io import StringIO
 import numpy as np
+from states import get_state_data
 
 csv_url = 'https://projects.fivethirtyeight.com/polls/data/president_polls.csv'
 
@@ -88,7 +89,6 @@ def get_color_code(period_index, total_periods):
     color_step = (start_color - end_color)
     return int(start_color - color_step * period_index)
 
-# # # I N S E R T # # #
 def calculate_and_print_differential(df, period_value, period_type='months', period_index=0, total_periods=1):
     df['created_at'] = pd.to_datetime(
         polls_df['created_at'], format='%m/%d/%y %H:%M', errors='coerce')
@@ -101,7 +101,6 @@ def calculate_and_print_differential(df, period_value, period_type='months', per
                                   (filtered_df['candidate_name'].isin(['Joe Biden', 'Donald Trump']))]
 
     if not filtered_df.empty:
-        # filtered_df['time_decay_weight'] = time_decay_weight(filtered_df['created_at'])
         filtered_df['time_decay_weight'] = time_decay_weight(filtered_df['created_at'], decay_rate, half_life_days)
         filtered_df['grade_weight'] = filtered_df['fte_grade'].map(grade_weights).fillna(0.0125)
         filtered_df['transparency_score'] = pd.to_numeric(filtered_df['transparency_score'], errors='coerce').fillna(0)
@@ -114,14 +113,24 @@ def calculate_and_print_differential(df, period_value, period_type='months', per
         filtered_df['is_partisan'] = filtered_df['partisan'].notna() & filtered_df['partisan'].ne('')
         filtered_df['partisan_weight'] = filtered_df['is_partisan'].map(partisan_weight)
         
+        # Fetch the latest state data
+        state_data = get_state_data()
+        
+        # Match the state field with the state names in the state data dictionary
+        def get_state_rank(state):
+            return state_data.get(state, 1)  # Default to 1 if state is not found
+        
+        filtered_df['state_rank'] = filtered_df['state'].apply(get_state_rank)
+        
         # Calculate the final combined weight
         filtered_df['combined_weight'] = \
-            filtered_df['grade_weight'] * \
-            filtered_df['transparency_weight'] * \
-            filtered_df['sample_size_weight'] * \
-            filtered_df['population_weight'] * \
-            filtered_df['partisan_weight'] * \
-            filtered_df['time_decay_weight']
+            filtered_df['time_decay_weight'] \
+            * filtered_df['grade_weight'] \
+            * filtered_df['transparency_weight'] \
+            * filtered_df['sample_size_weight'] \
+            * filtered_df['population_weight'] \
+            * filtered_df['partisan_weight'] \
+            * filtered_df['state_rank']
 
         weighted_sums = filtered_df.groupby('candidate_name')['combined_weight'].apply(lambda x: (x * filtered_df.loc[x.index, 'pct']).sum())
         total_weights = filtered_df.groupby('candidate_name')['combined_weight'].sum()
@@ -149,7 +158,6 @@ def calculate_and_print_differential(df, period_value, period_type='months', per
     else:
         print(
             f"{period_value}{period_type[0]}: No data available for the specified period")
-# # # I N S E R T # # #
 
 if __name__ == "__main__":
     polls_df = download_csv_data(csv_url)
