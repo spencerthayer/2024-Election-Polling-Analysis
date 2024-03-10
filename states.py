@@ -16,11 +16,11 @@ def get_state_data():
         'D1': 0.6,
         'D2': 0.4,
         'D3': 0.2,
-        'D4': 0.05,
+        'D4': 0,
         'R1': 0.6,
         'R2': 0.4,
         'R3': 0.2,
-        'R4': 0.05
+        'R4': 0
     }
 
     # Initialize variables to hold the max and min electoral vote counts
