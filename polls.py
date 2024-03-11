@@ -9,7 +9,7 @@ csv_url = 'https://projects.fivethirtyeight.com/polls/data/president_polls.csv'
 
 # Coloring
 start_color = 164
-skip_color = 6
+skip_color = 3
 
 # Define the time decay weighting
 decay_rate = 2
@@ -149,7 +149,7 @@ def calculate_and_print_differential(df, period_value, period_type='months', per
         color_code = get_color_code(period_index, total_periods, skip_color)
         
         # Modify your print statement to include the ANSI escape code for color
-        print(f"\033[38;5;{color_code}m{combined_period:<4} B:{biden_average:5.2f}% T:{trump_average:5.2f}% {abs(differential):+5.2f} {favored_candidate}\033[0m")
+        print(f"\033[38;5;{color_code}m{combined_period:<4} B:{abs(biden_average):5.2f}% T:{abs(trump_average):5.2f}% {abs(differential):+5.2f} {favored_candidate}\033[0m")
 
     else:
         print(
@@ -159,9 +159,9 @@ if __name__ == "__main__":
     polls_df = download_csv_data(csv_url)
     # print("Decay: " + str(decay_rate) + " over " + str(half_life_days) + " days.")
     periods = [
-        (24, 'months'),
-        (18, 'months'),
-        (12, 'months'),
+        # (24, 'months'),
+        # (18, 'months'),
+        # (12, 'months'),
         (6, 'months'),
         (3, 'months'),
         (1, 'months'),
