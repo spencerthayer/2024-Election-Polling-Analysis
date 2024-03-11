@@ -4,7 +4,7 @@ from datetime import datetime
 from io import StringIO
 import numpy as np
 
-print("Likability data...")
+# print("Likability data...")
 
 csv_url = 'https://projects.fivethirtyeight.com/polls/data/favorability_polls.csv'
 
@@ -63,19 +63,19 @@ def get_color_code(period_index, total_periods, skip_color):
     return start_color + (period_index * skip_color)
 
 def calculate_and_print_favorability(df, period_value, period_type='months', period_index=0, total_periods=1):
-    df['end_date'] = pd.to_datetime(
-        df['end_date'], format='%m/%d/%y', errors='coerce')
-    filtered_df = df.dropna(subset=['end_date']).copy()
+    df['created_at'] = pd.to_datetime(
+        df['created_at'], format='%m/%d/%y %H:%M', errors='coerce')
+    filtered_df = df.dropna(subset=['created_at']).copy()
     if period_type == 'months':
-        filtered_df = filtered_df[(filtered_df['end_date'] > (pd.Timestamp.now() - pd.DateOffset(months=period_value))) &
+        filtered_df = filtered_df[(filtered_df['created_at'] > (pd.Timestamp.now() - pd.DateOffset(months=period_value))) &
                                   (filtered_df['politician'].isin(['Joe Biden', 'Donald Trump']))]
     elif period_type == 'days':
-        filtered_df = filtered_df[(filtered_df['end_date'] > (pd.Timestamp.now() - pd.Timedelta(days=period_value))) &
+        filtered_df = filtered_df[(filtered_df['created_at'] > (pd.Timestamp.now() - pd.Timedelta(days=period_value))) &
                                   (filtered_df['politician'].isin(['Joe Biden', 'Donald Trump']))]
 
     if not filtered_df.empty:
         filtered_df['time_decay_weight'] = time_decay_weight(
-            filtered_df['end_date'], decay_rate, half_life_days)
+            filtered_df['created_at'], decay_rate, half_life_days)
         filtered_df['grade_weight'] = filtered_df['fte_grade'].map(grade_weights).fillna(0.0125)
         filtered_df['population'] = filtered_df['population'].str.lower()
         filtered_df['population_weight'] = filtered_df['population'].map(lambda x: population_weights.get(x, 1))

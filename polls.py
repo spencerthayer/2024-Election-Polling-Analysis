@@ -5,7 +5,7 @@ from io import StringIO
 import numpy as np
 from states import get_state_data
 
-print("Polling data...")
+# print("Polling data...")
 
 csv_url = 'https://projects.fivethirtyeight.com/polls/data/president_polls.csv'
 
