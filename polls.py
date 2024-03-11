@@ -150,7 +150,6 @@ def calculate_and_print_differential(df, period_value, period_type='months', per
         
         # Modify your print statement to include the ANSI escape code for color
         print(f"\033[38;5;{color_code}m{combined_period:<4} B:{biden_average:5.2f}% T:{trump_average:5.2f}% {abs(differential):+5.2f} {favored_candidate}\033[0m")
-        # print(f"\033[38;5;{color_code}m{combined_period:<4} B {format_percentage(biden_average)} | T {format_percentage(trump_average)} {format_differential(differential)} {favored_candidate}\033[0m")
 
     else:
         print(
