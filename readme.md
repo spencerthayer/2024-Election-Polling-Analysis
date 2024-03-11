@@ -1,14 +1,16 @@
 # Election Polling Analysis
 
-This Python script is designed to fetch, process, and analyze presidential polling data. Using data from FiveThirtyEight's publicly available [CSV file](https://projects.fivethirtyeight.com/polls/data/president_polls.csv), it applies a series of weightings to adjust for various factors such as poll quality, partisanship, sample population type, and state-specific electoral significance.
+This Python project is designed to fetch, process, and analyze presidential polling data. It consists of two main scripts: `polls.py` and `states.py`. The `polls.py` script fetches data from FiveThirtyEight's publicly available [CSV file](https://projects.fivethirtyeight.com/polls/data/president_polls.csv) and applies a series of weightings to adjust for various factors such as poll quality, partisanship, sample population type, and state-specific electoral significance. The `states.py` script scrapes data from the "270towin.com" website to obtain information about the electoral votes and political leaning of each state.
 
 ## Data Acquisition
 
-The script fetches polling data using the Python `Requests` library. The data is then loaded into a `Pandas` DataFrame for analysis. This approach ensures that the analysis is always up-to-date with the latest available data.
+The `polls.py` script fetches polling data using the Python `Requests` library. The data is then loaded into a `Pandas` DataFrame for analysis. This approach ensures that the analysis is always up-to-date with the latest available data.
+
+The `states.py` script uses the `BeautifulSoup` library to scrape data from the "270towin.com" website. It parses the scraped data to extract the relevant information about each state's electoral votes and political leaning.
 
 ## Weighting Calculations
 
-The script employs several mathematical principles to calculate the final weight of each poll. Below we will explore how these weights are derived and applied to the polling data to calculate the adjusted polls which should result in a nuanced analysis of polling data.
+The `polls.py` script employs several mathematical principles to calculate the final weight of each poll. Below we will explore how these weights are derived and applied to the polling data to calculate the adjusted polls, which should result in a nuanced analysis of polling data.
 
 ### 1. Time Weights
 
@@ -33,25 +35,39 @@ $$ t = \text{Current Date} - \text{Poll Conduct Date} $$
 Polls are weighted based on the grade assigned to the polling organization, which reflects their historical accuracy and methodology quality. FiveThirtyEight categorizes these grades, and in our script, each grade is associated with a specific numerical weight. This numerical weight translates the qualitative assessment of a poll's reliability into a quantitative factor that can be used in further calculations. The mapping from grades to numerical weights is as follows:
 
 ```
-A+: 1.0, A: 0.9, A-: 0.8, A/B: 0.75, B+: 0.7, B: 0.6, B-: 0.5, B/C: 0.45, C+: 0.4, C: 0.3, C-: 0.2, C/D: 0.15, D+: 0.1, D: 0.05, D-: 0.025, `null`: 0.0125
+A+: 1.0, A: 0.9, A-: 0.8, A/B: 0.75, B+: 0.7, B: 0.6, B-: 0.5, B/C: 0.45, C+: 0.4, C: 0.3, C-: 0.2, C/D: 0.15, D+: 0.1, D: 0.05, D-: 0.025
 ```
 
 Each grade is assigned a weight that diminishes as the grade decreases, with 'A+' polls being considered the most reliable (and thus given a weight of 1.0) and 'D-' polls being considered the least reliable (with a weight of 0.025). This numerical representation of grades allows for a standardized and objective approach to adjust the impact of each poll based on the credibility and track record of the polling organization.
 
-The logic behind this grading system is straightforward: higher grades correspond to higher numerical weights, indicating a greater degree of reliability and historical accuracy. Each grade step down represents a decrease in reliability, and this is reflected in the proportional decrease in the numerical weight. The specific weights were chosen to reflect a balance between acknowledging the quality of higher-graded polls and still allowing lower-graded polls to contribute to the overall analysis, albeit to a much lesser extent.
-
 For a poll with a specific grade, its grade weight is directly fetched from this predefined mapping. This explicit numerical representation ensures that the weight calculation process is transparent and consistent across all polls analyzed.
 
-### 3. Partisan Weight Adjustment
+### 3. Transparency Weight
+
+The transparency weight is calculated based on the transparency score provided in the polling data. The transparency score indicates the level of disclosure and methodological transparency of the polling organization. The transparency weight is computed by normalizing the transparency score of each poll with respect to the maximum transparency score among all polls.
+
+$$ W_{transparency} = \frac{\text{Transparency Score}}{\text{Max Transparency Score}} $$
+
+This normalization ensures that the transparency weight falls within the range [0, 1], with higher transparency scores resulting in higher weights.
+
+### 4. Sample Size Weight
+
+The sample size weight is calculated based on the sample size of each poll. Polls with larger sample sizes are generally considered more reliable and representative of the population. The sample size weight is computed by normalizing the sample size of each poll with respect to the minimum and maximum sample sizes among all polls.
+
+$$ W_{sample size} = \frac{\text{Sample Size} - \text{Min Sample Size}}{\text{Max Sample Size} - \text{Min Sample Size}} $$
+
+This normalization ensures that the sample size weight falls within the range [0, 1], with larger sample sizes resulting in higher weights.
+
+### 5. Partisan Weight Adjustment
 
 Partisan-sponsored polls may have a bias toward their sponsor. The script applies a correction factor to account for this bias:
 
-- If a poll is partisan (true), a weight of $0.25$ is applied.
+- If a poll is partisan (true), a weight of $0.1$ is applied.
 - If a poll is non-partisan (false), a weight of $1$ is applied.
 
 This adjustment, $W_{partisan}$, is applied directly based on the poll's partisanship status.
 
-### 4. Population Sample Weights
+### 6. Population Sample Weights
 
 Different polls target different segments of the population (e.g., likely voters, registered voters). The reliability of these polls varies with the population segment, so weights are applied accordingly:
 
@@ -63,88 +79,54 @@ Different polls target different segments of the population (e.g., likely voters
 
 This is formalized as $W_{population}(P)$ where $P$ stands for the population type of the poll.
 
-### 5. State-Specific Weights
+### 7. State-Specific Weights
 
 To incorporate state-specific polling data into the broader analysis, the script integrates data from `states.py`, which calculates a `state_rank` based on political projections and the proportion of electoral votes for each state. This rank represents the state's electoral significance and political leaning.
 
-To derive a mathematical formula for state ranking, I am considering various factors that contribute to a state's electoral significance and political leaning.
+The state rank $R_s$ is calculated as a weighted sum of two components: the normalized electoral vote count and the partisan lean of the state.
 
+$$ R_s = \alpha \cdot \frac{E_s}{E_{total}} + \beta \cdot P_s $$
+
+Where:
 - $R_s$: The rank of state $s$
 - $E_s$: The number of electoral votes of state $s$
 - $E_{total}$: The total number of electoral votes across all states
-- $P_s$: The projected partisan lean of state $s$, where $P_s \in [-1, 1]$. A value of -1 indicates a strong Democratic lean, while a value of 1 indicates a strong Republican lean.
-- $\alpha$: A weighting factor for the electoral vote component, where $\alpha \in [0, 1]$
-- $\beta$: A weighting factor for the partisan lean component, where $\beta \in [0, 1]$, and $\alpha + \beta = 1$
+- $P_s$: The projected partisan lean of state $s$, where $P_s \in [0, 1]$. A value of 0 indicates a strong Democratic lean, while a value of 1 indicates a strong Republican lean.
+- $\alpha$: A weighting factor for the electoral vote component
+- $\beta$: A weighting factor for the partisan lean component, and $\alpha + \beta = 1$
 
-The state rank $R_s$ can be calculated as a weighted sum of two components: the normalized electoral vote count and the partisan lean of the state.
+The weighting factors $\alpha$ and $\beta$ determine the relative importance of the electoral vote count and the partisan lean in the overall state ranking. These factors can be adjusted based on the desired emphasis on each component.
 
-1. Electoral Vote Component:
-   
-   The electoral vote component is calculated by normalizing the number of electoral votes of state $s$ with respect to the total number of electoral votes across all states.
-   
-   $$ \text{Electoral Vote Component} = \frac{E_s}{E_{total}} $$
-
-2. Partisan Lean Component:
-   
-   The partisan lean component is represented by $P_s$, which is a value between -1 and 1, indicating the projected partisan lean of the state.
-
-3. State Rank Formula:
-   
-   The state rank $R_s$ is calculated by combining the electoral vote component and the partisan lean component using their respective weighting factors:
-   
-   $$ R_s = \alpha \cdot \frac{E_s}{E_{total}} + \beta \cdot P_s $$
-
-   Where:
-   - $\alpha$: The weighting factor for the electoral vote component
-   - $\beta$: The weighting factor for the partisan lean component
-
-   The weighting factors $\alpha$ and $\beta$ determine the relative importance of the electoral vote count and the partisan lean in the overall state ranking. These factors can be adjusted based on the desired emphasis on each component.
-
-4. Normalization (Optional):
-   
-   To ensure that the state ranks are within a specific range (e.g., [0, 1]), we can apply a normalization step. One common approach is min-max normalization:
-   
-   $$ \text{Normalized } R_s = \frac{R_s - \min(R)}{\max(R) - \min(R)} $$
-
-   Where:
-   - $\min(R)$: The minimum state rank across all states
-   - $\max(R)$: The maximum state rank across all states
-
-   After normalization, the state ranks will be scaled to the range [0, 1], with 0 representing the state with the lowest rank and 1 representing the state with the highest rank.
-
-By applying this formula, we can calculate the state rank $R_s$ for each state, considering both its electoral vote count and its projected partisan lean. The resulting state ranks can be used to weight the significance of state-specific polls in the overall polling analysis.
-
-### 6. Combining Weights
+### 8. Combining Weights
 
 After calculating individual weights, the combined weight of a poll is given by:
 
-$$ W_{combined} = W_{grade} \times W_{partisan} \times W_{population} \times w(t) \times W_{state} $$
+$$ W_{combined} = W_{time decay} \times W_{grade} \times W_{transparency} \times W_{sample size} \times W_{population} \times W_{partisan} \times W_{state} $$
 
-This formula incorporates the time decay weight, grade weight, partisan weight, population weight, and state-specific weight to provide a comprehensive assessment of each poll's significance.
+This formula incorporates the time decay weight, grade weight, transparency weight, sample size weight, population weight, partisan weight, and state-specific weight to provide a comprehensive assessment of each poll's significance.
 
-### 7. Normalization
+### 9. Calculating Adjusted Poll Results
 
-The normalization process ensures that the sum of weights across all polls equals 1, allowing for a fair comparison and aggregation:
+To calculate the adjusted poll results for each candidate, the script follows these steps:
 
-$$ W_{normalized,i} = \frac{W_{combined,i}}{\sum_{j=1}^{N} W_{combined,j}} $$
+1. Filter the polling data for the desired time period (e.g., last 12 months, last 6 months, etc.) and candidates (Joe Biden and Donald Trump).
+2. Calculate the individual weights for each poll based on the factors mentioned above.
+3. Compute the combined weight for each poll by multiplying the individual weights.
+4. Calculate the weighted sum of poll results for each candidate by multiplying the poll result percentage by the combined weight.
+5. Sum the weighted poll results for each candidate.
+6. Divide the weighted sum by the total combined weights for each candidate to obtain the weighted average poll result.
+7. Calculate the differential between the weighted average poll results of the two candidates.
+8. Determine the favored candidate based on the differential.
+9. Print the results, including the weighted averages for each candidate, the differential, and the favored candidate, using colored output.
 
-- $W_{normalized,i}$: Normalized weight of the $i$th poll.
-- $W_{combined,i}$: Combined weight of the $i$th poll before normalization.
-- $N$: Total number of polls considered.
-- $j$: Is the index of each poll in the series of polls from 1 to $N$ where $N$ is the total number of polls.
+## Output
 
-### 8. Adjusted Poll Results Calculation
-
-Finally, to calculate adjusted poll results, each poll's result is multiplied by its normalized weight. This yields a weighted average that accounts for the reliability and relevance of each poll.
-
-$$ \text{Adjusted Result} = \sum_{i=1}^{N} (W_{normalized,i} \times \text{Poll Result}_i) $$
-
-This formula ensures that polls that are more recent, from higher-grade organizations, non-partisan, targeting more reliable population samples, and from states with greater electoral significance have a greater influence on the adjusted result.
+The `polls.py` script processes the polling data for different time periods (e.g., 12 months, 6 months, 3 months, 21 days, 14 days, etc.) and prints the analyzed results for each period. The output includes the weighted averages for each candidate (Biden and Trump), the differential between them, and the favored candidate based on the differential. The output is color-coded based on the time period to provide a visual representation of the trends.
 
 ## Conclusion
 
-By incorporating state-specific weights into the analysis, this script provides a more nuanced and comprehensive assessment of presidential polling data. The integration of data from `states.py` allows for the consideration of each state's unique electoral dynamics, ensuring that the adjusted poll results reflect the significance and political leanings of individual states.
+By incorporating state-specific weights and various other factors into the analysis, this project provides a nuanced and comprehensive assessment of presidential polling data. The integration of data from `states.py` allows for the consideration of each state's unique electoral dynamics, ensuring that the adjusted poll results reflect the significance and political leanings of individual states.
 
-This approach aims to strike a balance between the broad insights provided by national polls and the detailed, state-specific information captured by local polls. By carefully normalizing and combining these various weights, the script produces an adjusted result that offers a more accurate and representative picture of the current state of the presidential race.
+This approach aims to strike a balance between the broad insights provided by national polls and the detailed, state-specific information captured by local polls. By carefully normalizing and combining these various weights, the scripts produce adjusted results that offer a more accurate and representative picture of the current state of the presidential race.
 
-As with any polling analysis, there is always room for further refinement and improvement. The script's modular design allows for the incorporation of additional factors and adjustments as needed. Collaboration and feedback from the community are welcome to enhance the methodology and ensure the most accurate and meaningful analysis possible.
+As with any polling analysis, there is always room for further refinement and improvement. The modular design of the scripts allows for the incorporation of additional factors and adjustments as needed. Collaboration and feedback from the community are welcome to enhance the methodology and ensure the most accurate and meaningful analysis possible.
