@@ -1,14 +1,39 @@
 import pandas as pd
-import numpy as np
 import requests
+from datetime import datetime
 from io import StringIO
+import numpy as np
 
-# Constants for weighting calculations
+csv_url = 'https://projects.fivethirtyeight.com/polls/data/favorability_polls.csv'
+
+# Coloring
+start_color = 164
+skip_color = 3
+
+# Define the time decay weighting
+decay_rate = 2
+half_life_days = 30
+
+# Constants for the weighting calculations
 grade_weights = {
-    'A+': 1.0, 'A': 0.9, 'A-': 0.8, 'B+': 0.7, 'B': 0.6, 'B-': 0.5,
-    'C+': 0.4, 'C': 0.3, 'C-': 0.2, 'D+': 0.1, 'D': 0.05, 'D-': 0.025, 'F': 0
+    'A+': 1.0,
+    'A': 0.9,
+    'A-': 0.8,
+    'A/B': 0.75,
+    'B+': 0.7,
+    'B': 0.6,
+    'B-': 0.5,
+    'B/C': 0.45,
+    'C+': 0.4,
+    'C': 0.3,
+    'C-': 0.2,
+    'C/D': 0.15,
+    'D+': 0.1,
+    'D': 0.05,
+    'D-': 0.025
 }
 
+# Normalized population weights
 population_weights = {
     'lv': 1.0,
     'rv': 0.6666666666666666,
@@ -17,63 +42,81 @@ population_weights = {
     'all': 0.3333333333333333
 }
 
-# Define a function to calculate time decay weight
-half_life_days = 90
-def time_decay_weight(dates):
-    reference_date = pd.Timestamp.now()
-    days_old = (reference_date - dates).dt.days
-    days_old = np.where(days_old < 0, 0, days_old)
-    return np.exp(-np.log(2) * days_old / half_life_days)
-
+# Function to download and return a pandas DataFrame from a CSV URL
 def download_csv_data(url):
-    """Download CSV data from a specified URL."""
     response = requests.get(url)
     if response.status_code == 200:
-        print("CSV data successfully downloaded.")
-        return pd.read_csv(StringIO(response.content.decode('utf-8')))
+        csv_data = StringIO(response.content.decode('utf-8'))
+        return pd.read_csv(csv_data)
     else:
         raise Exception("Failed to download CSV data")
 
-def process_data(data, is_favorability=False):
-    """Process electoral or favorability polling data."""
-    data['end_date'] = pd.to_datetime(data['end_date'], format='%m/%d/%y', errors='coerce')
-    if is_favorability:
-        data = data.rename(columns={'politician': 'candidate_name', 'favorable': 'pct'})
-        data['pct'] = data['pct'] / 100
-    data['grade_weight'] = data['fte_grade'].map(grade_weights).fillna(0)
-    data['population_weight'] = data['population'].map(lambda x: population_weights.get(x, 0.333))
-    data['sample_size_weight'] = (data['sample_size'] - data['sample_size'].min()) / (data['sample_size'].max() - data['sample_size'].min()) if 'sample_size' in data.columns else 1
-    data['transparency_weight'] = data['transparency_score'] / data['transparency_score'].max() if 'transparency_score' in data.columns else 1
-    data['combined_weight'] = data['grade_weight'] * data['population_weight'] * data['sample_size_weight'] * data['transparency_weight']
-    data['time_decay_weight'] = time_decay_weight(data['end_date'])
-    print("Data processing complete. Sample of processed data:")
-    print(data.head())
-    return data
+# Define a function to calculate time decay weight
+def time_decay_weight(dates, decay_rate, half_life_days):
+    reference_date = pd.Timestamp.now()
+    days_old = (reference_date - dates).dt.days
+    return np.exp(-np.log(decay_rate) * days_old / half_life_days)
 
-def calculate_and_print_favorability(df, months_ago, latest_date_in_dataset):
-    df = df.copy()
-    cutoff_date = latest_date_in_dataset - pd.DateOffset(months=months_ago)
-    df_filtered = df[df['end_date'] > cutoff_date]
+def get_color_code(period_index, total_periods, skip_color):
+    return start_color + (period_index * skip_color)
 
-    for candidate in ['Joe Biden', 'Donald Trump']:
-        df_cand = df_filtered[df_filtered['candidate_name'] == candidate]
-        # Filter out rows where `pct` or combined weight is NaN
-        df_cand = df_cand.dropna(subset=['pct'])
-        df_cand['total_weight'] = df_cand['combined_weight'] * df_cand['time_decay_weight']
-        df_cand = df_cand.dropna(subset=['total_weight'])
+def calculate_and_print_favorability(df, period_value, period_type='months', period_index=0, total_periods=1):
+    df['end_date'] = pd.to_datetime(
+        df['end_date'], format='%m/%d/%y', errors='coerce')
+    filtered_df = df.dropna(subset=['end_date']).copy()
+    if period_type == 'months':
+        filtered_df = filtered_df[(filtered_df['end_date'] > (pd.Timestamp.now() - pd.DateOffset(months=period_value))) &
+                                  (filtered_df['politician'].isin(['Joe Biden', 'Donald Trump']))]
+    elif period_type == 'days':
+        filtered_df = filtered_df[(filtered_df['end_date'] > (pd.Timestamp.now() - pd.Timedelta(days=period_value))) &
+                                  (filtered_df['politician'].isin(['Joe Biden', 'Donald Trump']))]
 
-        if not df_cand.empty and df_cand['total_weight'].sum() > 0:
-            weighted_avg = np.average(df_cand['pct'], weights=df_cand['total_weight'])
-            print(f"{months_ago}m {candidate}: {weighted_avg:.2%}")
-        else:
-            print(f"{months_ago}m {candidate}: No data available or calculation issues")
+    if not filtered_df.empty:
+        filtered_df['time_decay_weight'] = time_decay_weight(
+            filtered_df['end_date'], decay_rate, half_life_days)
+        filtered_df['grade_weight'] = filtered_df['fte_grade'].map(grade_weights).fillna(0.0125)
+        filtered_df['population'] = filtered_df['population'].str.lower()
+        filtered_df['population_weight'] = filtered_df['population'].map(lambda x: population_weights.get(x, 1))
+
+        list_weights = np.array([
+            filtered_df['grade_weight'],
+            filtered_df['population_weight'],
+            filtered_df['time_decay_weight']
+        ])
+        filtered_df['combined_weight'] = np.prod(list_weights, axis=0)
+
+        weighted_sums = filtered_df.groupby('politician')['combined_weight'].apply(lambda x: (x * filtered_df.loc[x.index, 'favorable']/100).sum())
+        total_weights = filtered_df.groupby('politician')['combined_weight'].sum()
+        weighted_averages = weighted_sums / total_weights
+
+        biden_average = weighted_averages.get('Joe Biden', 0)
+        trump_average = weighted_averages.get('Donald Trump', 0)
+        differential = (biden_average) - (trump_average)
+
+        favored_candidate = "Biden" if differential > 0 else "Trump"
+
+        combined_period = f"{period_value}{period_type[0]}"
+
+        color_code = get_color_code(period_index, total_periods, skip_color)
+
+        print(f"\033[38;5;{color_code}m{combined_period:<4} B:{abs(biden_average):5.2%} T:{abs(trump_average):5.2%} {abs(differential):+5.2%} {favored_candidate}\033[0m")
+
+    else:
+        print(f"{period_value}{period_type[0]}: No data available for the specified period")
 
 if __name__ == "__main__":
-    favorability_csv_url = 'https://projects.fivethirtyeight.com/polls/data/favorability_polls.csv'
-    favorability_polls_df = process_data(download_csv_data(favorability_csv_url), is_favorability=True)
-    latest_date_in_dataset = favorability_polls_df['end_date'].max()
-    
-    print("Favorability Ratings Over Time:")
-    for months in [12, 6, 3, 1]:
-        print(f"\n{months} months ago:")
-        calculate_and_print_favorability(favorability_polls_df, months, latest_date_in_dataset)
+    favorability_df = download_csv_data(csv_url)
+    periods = [
+        (12, 'months'),
+        (6, 'months'), 
+        (3, 'months'),
+        (1, 'months'),
+        (21, 'days'),
+        (14, 'days'),
+        (7, 'days'),
+        (3, 'days'), 
+        (1, 'days')
+    ]
+    total_periods = len(periods)
+    for index, (period_value, period_type) in enumerate(periods):
+        calculate_and_print_favorability(favorability_df, period_value, period_type, index, total_periods)
