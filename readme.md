@@ -143,8 +143,6 @@ While this project provides a comprehensive approach to analyzing presidential p
 
 4. **Lack of uncertainty quantification**: The current analysis does not provide a measure of uncertainty or confidence intervals for the adjusted poll results. Incorporating techniques such as bootstrapping or Bayesian inference could help quantify the uncertainty associated with the estimates and provide a more complete picture of the range of possible outcomes.
 
-5. **Limited scope**: The project currently focuses solely on the U.S. presidential election between two main candidates (Biden and Trump). Expanding the analysis to include other races, such as congressional or gubernatorial elections, could provide a more comprehensive assessment of the political landscape. Additionally, accommodating scenarios with more than two candidates would make the project more versatile.
-
 To address these criticisms and further enhance the project, several next steps can be considered:
 
 1. **Sensitivity analysis**: Conduct sensitivity analyses to assess the impact of different weight assignments on the final results. This will help identify the most influential factors and guide the refinement of the weighting scheme.
@@ -155,6 +153,4 @@ To address these criticisms and further enhance the project, several next steps 
 
 4. **Uncertainty quantification**: Implement techniques like bootstrapping or Bayesian inference to quantify the uncertainty associated with the adjusted poll results. This will provide a more comprehensive understanding of the range of possible outcomes and help convey the level of confidence in the estimates.
 
-5. **Expansion to other races and scenarios**: Extend the project to analyze polling data for other types of races, such as congressional or gubernatorial elections. Additionally, modify the codebase to handle scenarios with more than two candidates, allowing for a more flexible and comprehensive analysis of political races.
-
-6. **User interface and visualization**: Develop a user-friendly interface and data visualization components to make the project more accessible and informative to a wider audience. This could include interactive dashboards, maps, and charts that allow users to explore the polling data and adjusted results in a more intuitive manner.
+5. **User interface and visualization**: Develop a user-friendly interface and data visualization components to make the project more accessible and informative to a wider audience. This could include interactive dashboards, maps, and charts that allow users to explore the polling data and adjusted results in a more intuitive manner.
