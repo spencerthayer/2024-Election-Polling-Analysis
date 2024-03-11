@@ -4,6 +4,8 @@ from datetime import datetime
 from io import StringIO
 import numpy as np
 
+print("Likability data...")
+
 csv_url = 'https://projects.fivethirtyeight.com/polls/data/favorability_polls.csv'
 
 # Coloring
