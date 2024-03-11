@@ -12,15 +12,15 @@ def get_state_data():
     response = requests.get(mapurl)
 
     pro_values = {
-        'T' : 0.9,  # Swing State
+        'T' : 0.8,  # Swing State
         'D1': 0.6,  # Tilts Democrat
-        'D2': 0.3,  # Leans Democrat
+        'D2': 0.4,  # Leans Democrat
         'D3': 0.1,  # Likely Democrat
         'D4': 0.05, # Safe Democrat
         'R1': 0.6,  # Tilts Republican
-        'R2': 0.3,  # Leans Republican
-        'R3': 0.1,  # Likely Republican
-        'R4': 0.05  # Safe Republican
+        'R2': 0.4,  # Leans Republican
+        'R3': 0.2,  # Likely Republican
+        'R4': 0.1  # Safe Republican
     }
 
     # Initialize variables to hold the max and min electoral vote counts
