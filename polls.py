@@ -9,7 +9,7 @@ csv_url = 'https://projects.fivethirtyeight.com/polls/data/president_polls.csv'
 
 # Coloring
 start_color = 200
-total_color_count = 5
+total_color_count = 9
 
 # Define the time decay weighting
 decay_rate = 2
@@ -168,8 +168,8 @@ if __name__ == "__main__":
     polls_df = download_csv_data(csv_url)
     # print("Decay: " + str(decay_rate) + " over " + str(half_life_days) + " days.")
     periods = [
-        (24, 'months'),
-        (18, 'months'),
+        # (24, 'months'),
+        # (18, 'months'),
         (12, 'months'),
         (6, 'months'),
         (3, 'months'),
