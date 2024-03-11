@@ -12,7 +12,7 @@ start_color = 200
 total_color_count = 5
 
 # Define the time decay weighting
-decay_rate = 0.5
+decay_rate = 2
 half_life_days = 30
 
 # Constants for the weighting calculations
@@ -62,7 +62,6 @@ def download_csv_data(url):
 def time_decay_weight(dates, decay_rate, half_life_days):
     reference_date = pd.Timestamp.now()
     days_old = (reference_date - dates).dt.days
-    # Ensuring the decay_rate is factored into the calculation
     return np.exp(-np.log(decay_rate) * days_old / half_life_days)
 
 def format_percentage(value):
@@ -122,16 +121,22 @@ def calculate_and_print_differential(df, period_value, period_type='months', per
         
         filtered_df['state_rank'] = filtered_df['state'].apply(get_state_rank)
         
+        list_weights = np.array([
+            filtered_df['grade_weight'],
+            filtered_df['transparency_weight'],
+            filtered_df['sample_size_weight'],
+            filtered_df['population_weight'],
+            filtered_df['partisan_weight'],
+            filtered_df['state_rank'],
+            filtered_df['time_decay_weight']
+        ])
         # Calculate the final combined weight
-        filtered_df['combined_weight'] = \
-            filtered_df['time_decay_weight'] \
-            * filtered_df['grade_weight'] \
-            * filtered_df['transparency_weight'] \
-            * filtered_df['sample_size_weight'] \
-            * filtered_df['population_weight'] \
-            * filtered_df['partisan_weight'] \
-            * filtered_df['state_rank']
-
+        # filtered_df['combined_weight'] = (sum(list_weights) / len(list_weights))
+        filtered_df['combined_weight'] = np.prod(list_weights, axis=0)
+        # print ( list_weights )
+        # print ( filtered_df['time_decay_weight'] )
+        # print ( filtered_df['combined_weight'] )
+        
         weighted_sums = filtered_df.groupby('candidate_name')['combined_weight'].apply(lambda x: (x * filtered_df.loc[x.index, 'pct']).sum())
         total_weights = filtered_df.groupby('candidate_name')['combined_weight'].sum()
         weighted_averages = weighted_sums / total_weights
