@@ -36,7 +36,7 @@ grade_weights = {
 
 # Define partisan weights
 partisan_weight = {
-    True:0.25,
+    True:0.1,
     False:1
     }
 
