@@ -8,8 +8,8 @@ from states import get_state_data
 csv_url = 'https://projects.fivethirtyeight.com/polls/data/president_polls.csv'
 
 # Coloring
-start_color = 200
-total_color_count = 9
+start_color = 164
+skip_color = 6
 
 # Define the time decay weighting
 decay_rate = 2
@@ -82,11 +82,8 @@ def format_differential(value):
     else:
         return f"+{formatted_str}"
 
-def get_color_code(period_index, total_periods):
-    # Define the color range for cyan to white gradient
-    end_color = start_color + (total_color_count)
-    color_step = (start_color - end_color)
-    return int(start_color - color_step * period_index)
+def get_color_code(period_index, total_periods, skip_color):
+    return start_color + (period_index * skip_color)
 
 def calculate_and_print_differential(df, period_value, period_type='months', period_index=0, total_periods=1):
     df['created_at'] = pd.to_datetime(
@@ -149,16 +146,11 @@ def calculate_and_print_differential(df, period_value, period_type='months', per
 
         combined_period = f"{period_value}{period_type[0]}"
 
-        color_code = get_color_code(period_index, total_periods)
-        if period_type == 'months':
-            # Use a different color range or logic for months, if needed
-            color_code = get_color_code(period_index, total_color_count)  # Adjusting for the 9 month periods
-        elif period_type == 'days':
-            # Use a different color range or logic for days, if needed
-            color_code = get_color_code(period_index - total_color_count, total_periods - total_color_count)  # Adjusting for the day periods starting after months
+        color_code = get_color_code(period_index, total_periods, skip_color)
         
         # Modify your print statement to include the ANSI escape code for color
-        print(f"\033[38;5;{color_code}m{combined_period:<4} B {biden_average:5.2f}% | T {trump_average:5.2f}% {abs(differential):+5.2f} {favored_candidate}\033[0m")
+        # print(f"\033[38;5;{color_code}m{combined_period:<4} B {biden_average:5.2f}% | T {trump_average:5.2f}% {abs(differential):+5.2f} {favored_candidate}\033[0m")
+        print(f"\033[38;5;{color_code}m{combined_period:<4} B {format_percentage(biden_average)} | T {format_percentage(trump_average)} {format_differential(differential)} {favored_candidate}\033[0m")
 
     else:
         print(
@@ -168,8 +160,8 @@ if __name__ == "__main__":
     polls_df = download_csv_data(csv_url)
     # print("Decay: " + str(decay_rate) + " over " + str(half_life_days) + " days.")
     periods = [
-        # (24, 'months'),
-        # (18, 'months'),
+        (24, 'months'),
+        (18, 'months'),
         (12, 'months'),
         (6, 'months'),
         (3, 'months'),
