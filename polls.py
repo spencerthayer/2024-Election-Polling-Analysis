@@ -161,7 +161,7 @@ if __name__ == "__main__":
     periods = [
         # (24, 'months'),
         # (18, 'months'),
-        # (12, 'months'),
+        (12, 'months'),
         (6, 'months'),
         (3, 'months'),
         (1, 'months'),
