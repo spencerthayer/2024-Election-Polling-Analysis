@@ -101,7 +101,7 @@ def calculate_and_print_favorability(df, period_value, period_type='months', per
 
         color_code = get_color_code(period_index, total_periods, skip_color)
 
-        print(f"\033[38;5;{color_code}m{combined_period:<4} B:{abs(biden_average):5.2%} T:{abs(trump_average):5.2%} {abs(differential):+5.2%} {favored_candidate}\033[0m")
+        print(f"\033[38;5;{color_code}m{combined_period:<4} B:{abs(biden_average):5.2%} T:{abs(trump_average):5.2%} {differential:+5.2%} {favored_candidate}\033[0m")
 
     else:
         print(f"{period_value}{period_type[0]}: No data available for the specified period")
