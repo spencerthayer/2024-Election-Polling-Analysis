@@ -121,13 +121,13 @@ def calculate_and_print_differential(df, period_value, period_type='months', per
         filtered_df['state_rank'] = filtered_df['state'].apply(get_state_rank)
         
         list_weights = np.array([
+            filtered_df['time_decay_weight'],
+            filtered_df['sample_size_weight'],
             filtered_df['grade_weight'],
             filtered_df['transparency_weight'],
-            filtered_df['sample_size_weight'],
             filtered_df['population_weight'],
             filtered_df['partisan_weight'],
             filtered_df['state_rank'],
-            filtered_df['time_decay_weight']
         ])
         # Calculate the final combined weight
         # filtered_df['combined_weight'] = (sum(list_weights) / len(list_weights))

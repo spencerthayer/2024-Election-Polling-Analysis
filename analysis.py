@@ -12,7 +12,7 @@ favorability_url = "https://projects.fivethirtyeight.com/polls/data/favorability
 
 #Data Parsing
 candidate_names = ['Joe Biden', 'Donald Trump']
-favorability_weight = 0.2
+favorability_weight = 0
 
 # Coloring
 start_color = 164
@@ -20,7 +20,7 @@ skip_color = 3
 
 # Define the time decay weighting
 decay_rate = 2
-half_life_days = 30
+half_life_days = 28
 
 # Constants for the weighting calculations
 grade_weights = {
@@ -51,8 +51,11 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Preprocess the data by converting date columns, handling missing values, and filtering irrelevant data.
     """
+    print("Original DataFrame shape:", df.shape)
+    
     df['created_at'] = pd.to_datetime(df['created_at'], format='%m/%d/%y %H:%M', errors='coerce')
     df = df.dropna(subset=['created_at'])
+    print("DataFrame shape after handling missing values:", df.shape)
     
     # Calculate transparency_weight and sample_size_weight
     df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
@@ -60,13 +63,16 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     df['transparency_weight'] = df['transparency_score'] / max_transparency_score
     min_sample_size, max_sample_size = df['sample_size'].min(), df['sample_size'].max()
     df['sample_size_weight'] = (df['sample_size'] - min_sample_size) / (max_sample_size - min_sample_size)
+    print("DataFrame shape after calculating weights:", df.shape)
     
     # Fetch state data and apply to calculate state_rank
     state_data = get_state_data()
     df['state_rank'] = df['state'].apply(lambda x: state_data.get(x, 1))
+    print("DataFrame shape after calculating state rank:", df.shape)
     
     # Ensure 'fte_grade' is processed to calculate 'grade_weight'
     df['grade_weight'] = df['fte_grade'].map(grade_weights).fillna(0.0125)
+    print("DataFrame shape after calculating grade weight:", df.shape)
     
     return df
 
@@ -98,13 +104,13 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
     df.loc[:, 'population_weight'] = df['population'].map(lambda x: population_weights.get(x, 1))
 
     list_weights = np.array([
+        df['time_decay_weight'],
+        df['sample_size_weight'],
         df['grade_weight'],
         df['transparency_weight'],
-        df['sample_size_weight'],
         df['population_weight'],
         df['partisan_weight'],
         df['state_rank'],
-        df['time_decay_weight']
     ])
     df['combined_weight'] = np.prod(list_weights, axis=0)
     
