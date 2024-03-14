@@ -32,7 +32,7 @@ $$ t = \text{Current Date} - \text{Poll Conduct Date} $$
 
 ### 2. Grade Weights Calculation
 
-Polls are weighted based on the grade assigned to the polling organization, which reflects their historical accuracy and methodology quality. FiveThirtyEight categorizes these grades, and in our script, each grade is associated with a specific numerical weight. This numerical weight translates the qualitative assessment of a poll's reliability into a quantitative factor that can be used in further calculations. The mapping from grades to numerical weights is as follows:
+Polls are weighted based on the grade assigned to the polling organization, which reflects their historical accuracy and methodology quality. FiveThirtyEight categorizes these grades, and in the script, each grade is associated with a specific numerical weight. This numerical weight translates the qualitative assessment of a poll's reliability into a quantitative factor that can be used in further calculations. The mapping from grades to numerical weights is as follows:
 
 ```
 A+: 1.0, A: 0.9, A-: 0.8, A/B: 0.75, B+: 0.7, B: 0.6, B-: 0.5, B/C: 0.45, C+: 0.4, C: 0.3, C-: 0.2, C/D: 0.15, D+: 0.1, D: 0.05, D-: 0.025
