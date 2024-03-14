@@ -14,7 +14,7 @@ skip_color = 3
 
 # Define the time decay weighting
 decay_rate = 2
-half_life_days = 30
+half_life_days = 28
 
 # Constants for the weighting calculations
 grade_weights = {

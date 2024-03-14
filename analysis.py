@@ -12,11 +12,11 @@ favorability_url = "https://projects.fivethirtyeight.com/polls/data/favorability
 
 #Data Parsing
 candidate_names = ['Joe Biden', 'Donald Trump']
-favorability_weight = 0.05
+favorability_weight = .1
 """
 When heavy_weight is set to True, the weights are multiplied together using np.prod(), giving more importance to the combined effect of all weights.
 
-When heavy_weight is set to False, the weights are averaged by taking the sum of weights divided by the number of weights.
+When heavy_weight is set to False, the weights are averaged by taking the sum of the weights divided by the number of weights.
 """
 heavy_weight = True
 
