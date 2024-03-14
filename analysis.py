@@ -12,7 +12,13 @@ favorability_url = "https://projects.fivethirtyeight.com/polls/data/favorability
 
 #Data Parsing
 candidate_names = ['Joe Biden', 'Donald Trump']
-favorability_weight = 0
+favorability_weight = 0.05
+"""
+When heavy_weight is set to True, the weights are multiplied together using np.prod(), giving more importance to the combined effect of all weights.
+
+When heavy_weight is set to False, the weights are averaged by taking the sum of weights divided by the number of weights.
+"""
+heavy_weight = True
 
 # Coloring
 start_color = 164
@@ -51,11 +57,11 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Preprocess the data by converting date columns, handling missing values, and filtering irrelevant data.
     """
-    print("Original DataFrame shape:", df.shape)
+    # print("Original DataFrame shape:", df.shape)
     
     df['created_at'] = pd.to_datetime(df['created_at'], format='%m/%d/%y %H:%M', errors='coerce')
     df = df.dropna(subset=['created_at'])
-    print("DataFrame shape after handling missing values:", df.shape)
+    # print("DataFrame shape after handling missing values:", df.shape)
     
     # Calculate transparency_weight and sample_size_weight
     df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
@@ -63,16 +69,16 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     df['transparency_weight'] = df['transparency_score'] / max_transparency_score
     min_sample_size, max_sample_size = df['sample_size'].min(), df['sample_size'].max()
     df['sample_size_weight'] = (df['sample_size'] - min_sample_size) / (max_sample_size - min_sample_size)
-    print("DataFrame shape after calculating weights:", df.shape)
+    # print("DataFrame shape after calculating weights:", df.shape)
     
     # Fetch state data and apply to calculate state_rank
     state_data = get_state_data()
     df['state_rank'] = df['state'].apply(lambda x: state_data.get(x, 1))
-    print("DataFrame shape after calculating state rank:", df.shape)
+    # print("DataFrame shape after calculating state rank:", df.shape)
     
     # Ensure 'fte_grade' is processed to calculate 'grade_weight'
     df['grade_weight'] = df['fte_grade'].map(grade_weights).fillna(0.0125)
-    print("DataFrame shape after calculating grade weight:", df.shape)
+    # print("DataFrame shape after calculating grade weight:", df.shape)
     
     return df
 
@@ -98,10 +104,23 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
     if 'grade_weight' not in df.columns:
         df['grade_weight'] = df['fte_grade'].map(grade_weights).fillna(0.0125)
     
+    # Calculate 'transparency_weight' using the filtered DataFrame
+    df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
+    max_transparency_score = df['transparency_score'].max()
+    df['transparency_weight'] = df['transparency_score'] / max_transparency_score
+    
+    # Calculate 'sample_size_weight' using the filtered DataFrame
+    min_sample_size, max_sample_size = df['sample_size'].min(), df['sample_size'].max()
+    df['sample_size_weight'] = (df['sample_size'] - min_sample_size) / (max_sample_size - min_sample_size)
+    
     df.loc[:, 'is_partisan'] = df['partisan'].notna() & df['partisan'].ne('')
     df.loc[:, 'partisan_weight'] = df['is_partisan'].map(partisan_weight)
     df.loc[:, 'population'] = df['population'].str.lower()
     df.loc[:, 'population_weight'] = df['population'].map(lambda x: population_weights.get(x, 1))
+    
+    # Fetch state data and apply to calculate state_rank
+    state_data = get_state_data()
+    df['state_rank'] = df['state'].apply(lambda x: state_data.get(x, 1))
 
     list_weights = np.array([
         df['time_decay_weight'],
@@ -112,7 +131,10 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
         df['partisan_weight'],
         df['state_rank'],
     ])
-    df['combined_weight'] = np.prod(list_weights, axis=0)
+    if heavy_weight == True:
+        df['combined_weight'] = np.prod(list_weights, axis=0)
+    elif heavy_weight == False:
+        df['combined_weight'] = sum(list_weights) / len(list_weights)
     
     weighted_sums = df.groupby('candidate_name')['combined_weight'].apply(lambda x: (x * df.loc[x.index, 'pct']).sum())
     total_weights = df.groupby('candidate_name')['combined_weight'].sum()
