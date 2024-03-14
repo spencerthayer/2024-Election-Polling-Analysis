@@ -4,6 +4,15 @@ from datetime import datetime
 from io import StringIO
 import numpy as np
 from typing import Dict, List
+from states import get_state_data
+
+# Download the Data
+polling_url = "https://projects.fivethirtyeight.com/polls/data/president_polls.csv"
+favorability_url = "https://projects.fivethirtyeight.com/polls/data/favorability_polls.csv"
+
+#Data Parsing
+candidate_names = ['Joe Biden', 'Donald Trump']
+favorability_weight = 0.2
 
 # Coloring
 start_color = 164
@@ -44,6 +53,21 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     df['created_at'] = pd.to_datetime(df['created_at'], format='%m/%d/%y %H:%M', errors='coerce')
     df = df.dropna(subset=['created_at'])
+    
+    # Calculate transparency_weight and sample_size_weight
+    df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
+    max_transparency_score = df['transparency_score'].max()
+    df['transparency_weight'] = df['transparency_score'] / max_transparency_score
+    min_sample_size, max_sample_size = df['sample_size'].min(), df['sample_size'].max()
+    df['sample_size_weight'] = (df['sample_size'] - min_sample_size) / (max_sample_size - min_sample_size)
+    
+    # Fetch state data and apply to calculate state_rank
+    state_data = get_state_data()
+    df['state_rank'] = df['state'].apply(lambda x: state_data.get(x, 1))
+    
+    # Ensure 'fte_grade' is processed to calculate 'grade_weight'
+    df['grade_weight'] = df['fte_grade'].map(grade_weights).fillna(0.0125)
+    
     return df
 
 def apply_time_decay_weight(df: pd.DataFrame, decay_rate: float, half_life_days: int) -> pd.DataFrame:
@@ -58,9 +82,16 @@ def apply_time_decay_weight(df: pd.DataFrame, decay_rate: float, half_life_days:
 def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> Dict[str, float]:
     """
     Calculate polling metrics for the specified candidate names.
+    Ensure percentages are handled correctly.
     """
-    df = df.copy()  # Create a copy of the DataFrame to avoid SettingWithCopyWarning
-    df.loc[:, 'grade_weight'] = df['fte_grade'].map(grade_weights).fillna(0.0125)
+    df = df.copy()
+    # Ensure 'pct' column values are between 0 and 100; adjust if they're between 0 and 1
+    df['pct'] = df['pct'].apply(lambda x: x if x > 1 else x * 100)
+    
+    # Check if 'grade_weight' needs to be calculated
+    if 'grade_weight' not in df.columns:
+        df['grade_weight'] = df['fte_grade'].map(grade_weights).fillna(0.0125)
+    
     df.loc[:, 'is_partisan'] = df['partisan'].notna() & df['partisan'].ne('')
     df.loc[:, 'partisan_weight'] = df['is_partisan'].map(partisan_weight)
     df.loc[:, 'population'] = df['population'].str.lower()
@@ -68,23 +99,33 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
 
     list_weights = np.array([
         df['grade_weight'],
-        df['partisan_weight'],
+        df['transparency_weight'],
+        df['sample_size_weight'],
         df['population_weight'],
+        df['partisan_weight'],
+        df['state_rank'],
         df['time_decay_weight']
     ])
-    df.loc[:, 'combined_weight'] = np.prod(list_weights, axis=0)
-
+    df['combined_weight'] = np.prod(list_weights, axis=0)
+    
     weighted_sums = df.groupby('candidate_name')['combined_weight'].apply(lambda x: (x * df.loc[x.index, 'pct']).sum())
     total_weights = df.groupby('candidate_name')['combined_weight'].sum()
-    weighted_averages = weighted_sums / total_weights
+    weighted_averages = (weighted_sums / total_weights)
     return {candidate: weighted_averages.get(candidate, 0) for candidate in candidate_names}
 
 def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[str]) -> Dict[str, float]:
     """
     Calculate favorability differentials for the specified candidate names.
+    Ensure percentages are handled correctly.
     """
-    df = df.copy()  # Create a copy of the DataFrame to avoid SettingWithCopyWarning
-    df.loc[:, 'grade_weight'] = df['fte_grade'].map(grade_weights).fillna(0.0125)
+    df = df.copy()
+    # Assume 'favorable' column values are between 0 and 100; adjust if they're between 0 and 1
+    df['favorable'] = df['favorable'].apply(lambda x: x if x > 1 else x * 100)
+    
+    # Check if 'grade_weight' needs to be calculated
+    if 'grade_weight' not in df.columns:
+        df['grade_weight'] = df['fte_grade'].map(grade_weights).fillna(0.0125)
+    
     df.loc[:, 'population'] = df['population'].str.lower()
     df.loc[:, 'population_weight'] = df['population'].map(lambda x: population_weights.get(x, 1))
 
@@ -93,11 +134,11 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
         df['population_weight'],
         df['time_decay_weight']
     ])
-    df.loc[:, 'combined_weight'] = np.prod(list_weights, axis=0)
-
-    weighted_sums = df.groupby('politician')['combined_weight'].apply(lambda x: (x * df.loc[x.index, 'favorable']/100).sum())
+    df['combined_weight'] = np.prod(list_weights, axis=0)
+    
+    weighted_sums = df.groupby('politician')['combined_weight'].apply(lambda x: (x * df.loc[x.index, 'favorable']).sum())
     total_weights = df.groupby('politician')['combined_weight'].sum()
-    weighted_averages = weighted_sums / total_weights
+    weighted_averages = (weighted_sums / total_weights)
     return {candidate: weighted_averages.get(candidate, 0) for candidate in candidate_names}
 
 def combine_analysis(polling_metrics: Dict[str, float], favorability_differential: Dict[str, float], favorability_weight: float) -> Dict[str, float]:
@@ -118,22 +159,19 @@ def print_with_color(text: str, color_code: int):
     """
     print(f"\033[38;5;{color_code}m{text}\033[0m")
 
-def output_results(combined_results: Dict[str, float], color_index: int):
+def output_results(combined_results: Dict[str, float], color_index: int, period_value: int, period_type: str):
     """
-    Format and output the combined analysis results with color coding.
+    Corrected output formatting to display percentages properly.
     """
-    for candidate, score in combined_results.items():
-        color_code = start_color + (color_index * skip_color)
-        print_with_color(f"{candidate}: {score:.2f}", color_code)
-        color_index += 1
-    return color_index
+    biden_score = combined_results['Joe Biden']
+    trump_score = combined_results['Donald Trump']
+    differential = trump_score - biden_score
+    favored_candidate = "Biden" if differential < 0 else "Trump"
+    color_code = start_color + (color_index * skip_color)
+    # Ensure percentages are displayed correctly
+    print(f"\033[38;5;{color_code}m{period_value:2d}{period_type[0]:<4} B:{biden_score:5.2f}% T:{trump_score:5.2f}% {abs(differential):+5.2f} {favored_candidate}\033[0m")
 
 def main():
-    polling_url = "https://projects.fivethirtyeight.com/polls/data/president_polls.csv"
-    favorability_url = "https://projects.fivethirtyeight.com/polls/data/favorability_polls.csv"
-    
-    candidate_names = ['Joe Biden', 'Donald Trump']
-    favorability_weight = 0.2
     
     polling_df = download_csv_data(polling_url)
     favorability_df = download_csv_data(favorability_url)
@@ -157,8 +195,8 @@ def main():
         
         combined_results = combine_analysis(polling_metrics, favorability_differential, favorability_weight)
         
-        print_with_color(f"\nAnalysis for the last {period_value} {period_type}:", start_color + (color_index * skip_color))
-        color_index = output_results(combined_results, color_index)
+        output_results(combined_results, color_index, period_value, period_type)
+        color_index += 1
 
 if __name__ == "__main__":
     main()
