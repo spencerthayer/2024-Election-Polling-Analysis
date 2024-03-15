@@ -13,7 +13,7 @@ favorability_url = "https://projects.fivethirtyeight.com/polls/data/favorability
 
 # Data Parsing
 candidate_names = ['Joe Biden', 'Donald Trump']
-favorability_weight = 0.1
+favorability_weight = 0.2
 """
 When heavy_weight is set to True, the weights are multiplied together using np.prod(), giving more importance to the combined effect of all weights.
 
@@ -214,7 +214,7 @@ def output_results(combined_results: Dict[str, float], color_index: int, period_
     differential = trump_score - biden_score
     favored_candidate = "Biden" if differential < 0 else "Trump"
     color_code = start_color + (color_index * skip_color)
-    print(f"\033[38;5;{color_code}m{period_value:2d}{period_type[0]:<4} B:{biden_score:5.2f}% (±{biden_margin:.2f}%) T:{trump_score:5.2f}% (±{trump_margin:.2f}%) {abs(differential):+5.2f} {favored_candidate}\033[0m")
+    print(f"\033[38;5;{color_code}m{period_value:2d}{period_type[0]:<4} B {biden_score:5.2f}% ±{biden_margin:.2f} | T {trump_score:5.2f}% ±{trump_margin:.2f} | {abs(differential):+5.2f} {favored_candidate}\033[0m")
 
 def main():
     polling_df = download_csv_data(polling_url)
@@ -246,12 +246,6 @@ def main():
 
         output_results(combined_results, color_index, period_value, period_type)
         color_index += 1
-
-    # Test the margin_of_error function with known values
-    # n = 1000  # Sample size
-    # p = 0.5   # Population proportion (estimate)
-    # mo_e = margin_of_error(n, p)
-    # print(f"\nStandard Margin of Error (n=1000, p=0.5): ±{mo_e:.2f}%")
 
 if __name__ == "__main__":
     main()
