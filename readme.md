@@ -4,7 +4,7 @@ This Python project is designed to fetch, process, and analyze presidential poll
 
 ## Data Acquisition
 
-Presidential Polling Data: Sourced from [FiveThirtyEight](https://projects.fivethirtyeight.com/), this dataset is accessed via the Python `Requests ~library, ensuring real-time relevance by incorporating the latest available data into a `Pandas` DataFrame for subsequent analysis.
+Presidential Polling Data: Sourced from [FiveThirtyEight](https://projects.fivethirtyeight.com/), this dataset is accessed via the Python `Requests` ~library, ensuring real-time relevance by incorporating the latest available data into a `Pandas` DataFrame for subsequent analysis.
 
 Favorability Polling Data: Complementing presidential polling, [FiveThirtyEight](https://projects.fivethirtyeight.com/)'s favorability data offers insight into public sentiment regarding candidates, fetched similarly and integrated into the analysis to enhance depth.
 
