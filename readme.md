@@ -206,15 +206,17 @@ The `analysis.py` script incorporates an Out-of-Bag (OOB) Random Forest implemen
 
 #### Mathematical Formulation
 
-Let's denote the training dataset as $\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^N$, where $\mathbf{x}_i \in \mathbb{R}^d$ represents the input features and $y_i \in \mathbb{R}$ represents the target variable for the $i$-th sample. The Random Forest model consists of $M$ decision trees, where each tree $T_j$ is trained on a bootstrap sample $\mathcal{D}_j$ drawn with replacement from the original dataset $\mathcal{D}$.
+Let's denote the training dataset as: $$\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^N$$
+
+Where $\mathbf{x}_i \in \mathbb{R}^d$ represents the input features and $y_i \in \mathbb{R}$ represents the target variable for the $i$-th sample. The Random Forest model consists of $M$ decision trees, where each tree $T_j$ is trained on a bootstrap sample $\mathcal{D}_j$ drawn with replacement from the original dataset $\mathcal{D}$.
 
 For each tree $T_j$, the OOB sample $\mathcal{D}_j^{OOB}$ is defined as the set of samples from $\mathcal{D}$ that were not included in the bootstrap sample $\mathcal{D}_j$:
 
-$$ \mathcal{D}_j^{OOB} = \mathcal{D} \setminus \mathcal{D}_j $$
+$$\mathcal{D}_j^{OOB} = \mathcal{D} \setminus \mathcal{D}_j$$
 
 The OOB prediction for the $i$-th sample, denoted as $\hat{y}_i^{OOB}$, is obtained by averaging the predictions of the trees for which the $i$-th sample was in the OOB set:
 
-$$ \hat{y}_i^{OOB} = \frac{1}{|\{j: i \in \mathcal{D}_j^{OOB}\}|} \sum_{j: i \in \mathcal{D}_j^{OOB}} T_j(\mathbf{x}_i) $$
+$$\hat{y}_i^{OOB} = \frac{1}{|\{j: i \in \mathcal{D}_j^{OOB}\}|} \sum_{j: i \in \mathcal{D}_j^{OOB}} T_j(\mathbf{x}_i)$$
 
 Where $T_j(\mathbf{x}_i)$ represents the prediction of the $j$-th tree for the input features $\mathbf{x}_i$.
 
