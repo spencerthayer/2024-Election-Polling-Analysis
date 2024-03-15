@@ -198,6 +198,8 @@ This approach aims to strike a balance between the broad insights provided by na
 
 As with any polling analysis, there is always room for further refinement and improvement. The modular design of the scripts allows for the incorporation of additional factors and adjustments as needed. Collaboration and feedback from the community are welcome to enhance the methodology and ensure the most accurate and meaningful analysis possible.
 
+---
+
 ### Out-of-Bag (OOB) Random Forest Implementation (Beta Test)
 
 The `analysis.py` script incorporates an Out-of-Bag (OOB) Random Forest implementation to estimate the variance of the model's predictions. This approach leverages the inherent properties of Random Forests, where each tree is trained on a different bootstrap sample of the data, and the samples not included in the bootstrap sample (i.e., left out of the bag) are used to calculate the OOB error or variance.
@@ -251,6 +253,8 @@ The OOB variance provides insights into the variability and reliability of the R
 4. **Predictive Power and Uncertainty**: The OOB results, when combined with the predicted percentages (e.g., B:41.55% vs. T:44.15%), provide a more comprehensive understanding of the model's predictive power and the uncertainty associated with those predictions. The variance measures how much the model's predictions for the outcome (favorability or voting percentages) might vary, adding a layer of understanding to the confidence in the model's output.
 
 The OOB variance should be used as a tool for model evaluation alongside other metrics, guiding model improvement efforts, informing decision-making, and monitoring temporal dynamics. It offers valuable insights into the reliability and stability of the Random Forest model's predictions, aiding in the interpretation and utilization of the model's outputs.
+
+---
 
 ## Possible Next Steps
 
