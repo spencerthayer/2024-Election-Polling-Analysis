@@ -248,10 +248,10 @@ def main():
         color_index += 1
 
     # Test the margin_of_error function with known values
-    n = 1000  # Sample size
-    p = 0.5   # Population proportion (estimate)
-    mo_e = margin_of_error(n, p)
-    print(f"\nStandard Margin of Error (n=1000, p=0.5): ±{mo_e:.2f}%")
+    # n = 1000  # Sample size
+    # p = 0.5   # Population proportion (estimate)
+    # mo_e = margin_of_error(n, p)
+    # print(f"\nStandard Margin of Error (n=1000, p=0.5): ±{mo_e:.2f}%")
 
 if __name__ == "__main__":
     main()
