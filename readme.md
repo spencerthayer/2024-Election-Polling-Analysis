@@ -1,12 +1,12 @@
 # Election Polling Analysis
 
-This Python project is designed to fetch, process, and analyze presidential polling data. It consists of two main scripts: `analysis.py` and `states.py`. The `analysis.py` script fetches data from FiveThirtyEight's publicly available CSV files for [presidential polls](https://projects.fivethirtyeight.com/polls/data/president_polls.csv) and [favorability polls](https://projects.fivethirtyeight.com/polls/data/favorability_polls.csv), and applies a series of weightings to adjust for various factors such as poll quality, partisanship, and sample population type. The `states.py` script scrapes data from the [270 To Win](https://www.270towin.com/) website to obtain information about the electoral votes and political leaning of each state to calculate the state-specific electoral significance.
+This Python project is designed to fetch, process, and analyze presidential polling data. It consists of two main scripts: `analysis.py` and `states.py`. The `analysis.py` script fetches data from [FiveThirtyEight](https://projects.fivethirtyeight.com/)'s publicly available CSV files for [presidential polls](https://projects.fivethirtyeight.com/polls/data/president_polls.csv) and [favorability polls](https://projects.fivethirtyeight.com/polls/data/favorability_polls.csv), and applies a series of weightings to adjust for various factors such as poll quality, partisanship, and sample population type. The `states.py` script scrapes data from the [270 To Win](https://www.270towin.com/) website to obtain information about the electoral votes and political leaning of each state to calculate the state-specific electoral significance.
 
 ## Data Acquisition
 
-Presidential Polling Data: Sourced from FiveThirtyEight, this dataset is accessed via the Python `Requests ~library, ensuring real-time relevance by incorporating the latest available data into a `Pandas` DataFrame for subsequent analysis.
+Presidential Polling Data: Sourced from [FiveThirtyEight](https://projects.fivethirtyeight.com/), this dataset is accessed via the Python `Requests ~library, ensuring real-time relevance by incorporating the latest available data into a `Pandas` DataFrame for subsequent analysis.
 
-Favorability Polling Data: Complementing presidential polling, FiveThirtyEight's favorability data offers insight into public sentiment regarding candidates, fetched similarly and integrated into the analysis to enhance depth.
+Favorability Polling Data: Complementing presidential polling, [FiveThirtyEight](https://projects.fivethirtyeight.com/)'s favorability data offers insight into public sentiment regarding candidates, fetched similarly and integrated into the analysis to enhance depth.
 
 State Data: The states data enriches the analysis by integrating state-specific electoral information, offering a more granular view of the electoral landscape.
 
@@ -34,7 +34,7 @@ $$ t = \text{Current Date} - \text{Poll Conduct Date} $$
 
 ### 2. Grade Weight
 
-Polls are weighted based on the grade assigned to the polling organization, which reflects their historical accuracy and methodology quality. FiveThirtyEight categorizes these grades, and in the script, each grade is associated with a specific numerical weight. This numerical weight translates the qualitative assessment of a poll's reliability into a quantitative factor that can be used in further calculations. The mapping from grades to numerical weights is as follows:
+Polls are weighted based on the grade assigned to the polling organization, which reflects their historical accuracy and methodology quality. [FiveThirtyEight](https://projects.fivethirtyeight.com/) categorizes these grades, and in the script, each grade is associated with a specific numerical weight. This numerical weight translates the qualitative assessment of a poll's reliability into a quantitative factor that can be used in further calculations. The mapping from grades to numerical weights is as follows:
 
 ```
 A+: 1.0, A: 0.9, A-: 0.8, A/B: 0.75, B+: 0.7, B: 0.6, B-: 0.5, B/C: 0.45, C+: 0.4, C: 0.3, C-: 0.2, C/D: 0.15, D+: 0.1, D: 0.05, D-: 0.025
