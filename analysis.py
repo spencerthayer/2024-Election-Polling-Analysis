@@ -234,8 +234,8 @@ def output_results(combined_results: Dict[str, float], color_index: int, period_
     differential = trump_score - biden_score
     favored_candidate = "Biden" if differential < 0 else "Trump"
     color_code = start_color + (color_index * skip_color)
-    print(f"\033[38;5;{color_code}m{period_value:2d}{period_type[0]:<4} B⋮{biden_score:5.2f}±{biden_margin:.2f}% T⋮{trump_score:5.2f}±{trump_margin:.2f}% {abs(differential):+5.2f} {favored_candidate} σ²∿{oob_variance:.4f}\033[0m")
-
+    print(f"\033[38;5;{color_code}m{period_value:2d}{period_type[0]:<4} B∙{biden_score:5.2f}±{biden_margin:.2f}% T∙{trump_score:5.2f}±{trump_margin:.2f}% {abs(differential):+5.2f} {favored_candidate} 𝛂{oob_variance:5.1f}\033[0m")
+# 𝛂σ²
 def _get_unsampled_indices(tree, n_samples):
     # Get the indices of the OOB samples for the given tree
     unsampled_mask = np.ones(n_samples, dtype=bool)
