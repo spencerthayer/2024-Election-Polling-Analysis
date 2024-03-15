@@ -206,7 +206,9 @@ The `analysis.py` script incorporates an Out-of-Bag (OOB) Random Forest implemen
 
 #### Mathematical Formulation
 
-Let's denote the training dataset as: $$\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^N$$
+Let's denote the training dataset as:
+
+$$\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^N$$
 
 Where $\mathbf{x}_i \in \mathbb{R}^d$ represents the input features and $y_i \in \mathbb{R}$ represents the target variable for the $i$-th sample. The Random Forest model consists of $M$ decision trees, where each tree $T_j$ is trained on a bootstrap sample $\mathcal{D}_j$ drawn with replacement from the original dataset $\mathcal{D}$.
 
