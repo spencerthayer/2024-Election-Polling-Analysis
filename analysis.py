@@ -286,7 +286,7 @@ def main():
         y = filtered_favorability_df[target_column].values
 
         # Initialize and train the Random Forest model
-        rf = RandomForestRegressor(n_estimators=100, oob_score=True, random_state=42, bootstrap=True)
+        rf = RandomForestRegressor(n_estimators=1000, oob_score=True, random_state=500, bootstrap=True)
         rf.fit(X, y)
 
         # Implement OOB Variance Estimation
