@@ -182,7 +182,7 @@ The script combines the polling metrics and favorability differential using a we
 
 $$ \text{Combined Result} = (1 - \alpha) \cdot \text{Polling Metric} + \alpha \cdot \text{Favorability Differential} $$
 
-where $\alpha$ is the `favorability_weight` parameter that determines the relative importance of the favorability differential in the combined result.
+Where $\alpha$ is the `favorability_weight` parameter that determines the relative importance of the favorability differential in the combined result.
 
 The margin of error for the combined result is directly obtained from the polling metrics.
 
@@ -197,6 +197,60 @@ By incorporating favorability data, state-specific weights, and various other fa
 This approach aims to strike a balance between the broad insights provided by national polls, the detailed, state-specific information captured by local polls, and the additional context provided by favorability ratings. By carefully normalizing and combining these various weights, the scripts produce adjusted results that offer a more accurate and representative picture of the current state of the presidential race.
 
 As with any polling analysis, there is always room for further refinement and improvement. The modular design of the scripts allows for the incorporation of additional factors and adjustments as needed. Collaboration and feedback from the community are welcome to enhance the methodology and ensure the most accurate and meaningful analysis possible.
+
+### Out-of-Bag (OOB) Random Forest Implementation (Beta Test)
+
+The `analysis.py` script incorporates an Out-of-Bag (OOB) Random Forest implementation to estimate the variance of the model's predictions. This approach leverages the inherent properties of Random Forests, where each tree is trained on a different bootstrap sample of the data, and the samples not included in the bootstrap sample (i.e., left out of the bag) are used to calculate the OOB error or variance.
+
+#### Mathematical Formulation
+
+Let's denote the training dataset as $\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^N$, where $\mathbf{x}_i \in \mathbb{R}^d$ represents the input features and $y_i \in \mathbb{R}$ represents the target variable for the $i$-th sample. The Random Forest model consists of $M$ decision trees, where each tree $T_j$ is trained on a bootstrap sample $\mathcal{D}_j$ drawn with replacement from the original dataset $\mathcal{D}$.
+
+For each tree $T_j$, the OOB sample $\mathcal{D}_j^{OOB}$ is defined as the set of samples from $\mathcal{D}$ that were not included in the bootstrap sample $\mathcal{D}_j$:
+
+$$ \mathcal{D}_j^{OOB} = \mathcal{D} \setminus \mathcal{D}_j $$
+
+The OOB prediction for the $i$-th sample, denoted as $\hat{y}_i^{OOB}$, is obtained by averaging the predictions of the trees for which the $i$-th sample was in the OOB set:
+
+$$ \hat{y}_i^{OOB} = \frac{1}{|\{j: i \in \mathcal{D}_j^{OOB}\}|} \sum_{j: i \in \mathcal{D}_j^{OOB}} T_j(\mathbf{x}_i) $$
+
+Where $T_j(\mathbf{x}_i)$ represents the prediction of the $j$-th tree for the input features $\mathbf{x}_i$.
+
+The OOB variance, denoted as $\sigma_{OOB}^2$, is then calculated as the variance of the differences between the true target values and the OOB predictions:
+
+$$ \sigma_{OOB}^2 = \frac{1}{N} \sum_{i=1}^N (y_i - \hat{y}_i^{OOB})^2 $$
+
+#### Implementation Details
+
+In the `analysis.py` script, the OOB variance estimation is implemented as follows:
+
+1. The Random Forest model is initialized with `n_estimators=100` (number of trees), `oob_score=True` (to enable OOB scoring), `random_state=42` (for reproducibility), and `bootstrap=True` (to perform bootstrap sampling).
+
+2. The model is trained on the input features `X` and target variable `y` using the `fit()` method.
+
+3. The `_get_unsampled_indices()` function is defined to retrieve the indices of the OOB samples for each tree in the forest.
+
+4. The OOB predictions are calculated by iterating over each tree in the forest, obtaining the unsampled indices using `_get_unsampled_indices()`, and accumulating the predictions for the OOB samples.
+
+5. The OOB sample counts are computed using `np.bincount()` to determine the number of times each sample was included in the OOB sets.
+
+6. The OOB predictions are divided by the OOB sample counts (with a small epsilon value added to avoid division by zero) to obtain the final OOB predictions.
+
+7. The OOB variance is calculated using the formula: $\sigma_{OOB}^2 = \text{Var}(y - \hat{y}^{OOB})$, where $y$ represents the true target values and $\hat{y}^{OOB}$ represents the OOB predictions.
+
+#### Interpretation and Implications
+
+The OOB variance provides insights into the variability and reliability of the Random Forest model's predictions. Here are some key points to consider:
+
+1. **Consistency Across Time Frames**: The OOB variance indicates the stability or variability of the model's predictions over different time periods leading up to an event (e.g., an election). A lower OOB variance suggests more consistent predictions across different bootstrap samples, while a higher OOB variance indicates greater variability.
+
+2. **Model Reliability**: Generally, a lower OOB variance is desirable as it suggests that the model's predictions are relatively stable and not overly dependent on the specific subset of data used for training. However, some variability is expected, especially in complex datasets with many variables.
+
+3. **Overfitting Detection**: Significantly low OOB variance might indicate that the model is overfitting the data, particularly if the predictive performance on external validation sets is poor. This would imply that the model is too closely tailored to the training data, including its noise, rather than capturing the underlying patterns applicable to unseen data.
+
+4. **Predictive Power and Uncertainty**: The OOB results, when combined with the predicted percentages (e.g., B:41.55% vs. T:44.15%), provide a more comprehensive understanding of the model's predictive power and the uncertainty associated with those predictions. The variance measures how much the model's predictions for the outcome (favorability or voting percentages) might vary, adding a layer of understanding to the confidence in the model's output.
+
+The OOB variance should be used as a tool for model evaluation alongside other metrics, guiding model improvement efforts, informing decision-making, and monitoring temporal dynamics. It offers valuable insights into the reliability and stability of the Random Forest model's predictions, aiding in the interpretation and utilization of the model's outputs.
 
 ## Possible Next Steps
 
@@ -214,9 +268,9 @@ To further enhance the project, several next steps can be considered:
 
 6. **Sophisticated Stratification Frame Construction**: Introduce data integration techniques such as multiple imputation to merge disparate data sources, enhancing the completeness and representativeness of the stratification frame. This involves identifying common variables across datasets, using them to predict missing values, and creating a more comprehensive dataset that improves upon relying solely on census tables.
 
-7. **Advanced Weighting with Machine Learning**: Replace traditional raking methods with machine learning algorithms such as random forests for weighting. This approach would involve using random forests to identify and automatically adjust for interactions between variables at both individual and aggregate levels, which could enhance the model's accuracy and reduce specification errors.
+7. **Advanced Weighting with Machine Learning**: ~~Replace traditional raking methods with machine learning algorithms such as random forests for weighting. This approach would involve using random forests to identify and automatically adjust for interactions between variables at both individual and aggregate levels, which could enhance the model's accuracy and reduce specification errors.~~
 
-8. **Incorporation of Uncertainty Estimates**: Apply techniques like the infinitesimal jackknife and out-of-bag neighbors within a random forest framework to estimate uncertainty around cell-level predictions. This addition would require modifications to the forecasting model to include these techniques and present uncertainty estimates alongside the forecasts, offering a more nuanced view of the predictions' reliability.
+8. **Incorporation of Uncertainty Estimates**: ~~Apply techniques like the infinitesimal jackknife and out-of-bag neighbors within a random forest framework to estimate uncertainty around cell-level predictions. This addition would require modifications to the forecasting model to include these techniques and present uncertainty estimates alongside the forecasts, offering a more nuanced view of the predictions' reliability.~~
 
 9. **Integration with Election Forecasting Models from Multiple Sources**: Develop an ensemble method that averages forecasts from multiple online sample sources. This strategy would involve aggregating predictions from these varied sources and calculating a weighted average, aiming to cancel out differential biases and improve overall forecast accuracy.
 
