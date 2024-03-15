@@ -13,7 +13,7 @@ def get_state_data():
         'D1': 0.6,  # Tilts Democrat
         'D2': 0.4,  # Leans Democrat
         'D3': 0.1,  # Likely Democrat
-        'D4': 0.05, # Safe Democrat
+        'D4': 0.1, # Safe Democrat
         'R1': 0.6,  # Tilts Republican
         'R2': 0.4,  # Leans Republican
         'R3': 0.2,  # Likely Republican

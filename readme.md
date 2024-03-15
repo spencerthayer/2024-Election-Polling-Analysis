@@ -90,16 +90,16 @@ The script first retrieves data from the [270 To Win](https://www.270towin.com/)
 The partisan lean is mapped to a numerical value using the `pro_values` dictionary:
 
 ```python
-pro_values = {
-    'T' : 0.8,  # Swing State
-    'D1': 0.6,  # Tilts Democrat
-    'D2': 0.4,  # Leans Democrat
-    'D3': 0.1,  # Likely Democrat
-    'D4': 0.05, # Safe Democrat
-    'R1': 0.6,  # Tilts Republican
-    'R2': 0.4,  # Leans Republican
-    'R3': 0.2,  # Likely Republican
-    'R4': 0.1   # Safe Republican
+    pro_values = {
+        'T' : 0.8,  # Swing State
+        'D1': 0.6,  # Tilts Democrat
+        'D2': 0.4,  # Leans Democrat
+        'D3': 0.1,  # Likely Democrat
+        'D4': 0.1, # Safe Democrat
+        'R1': 0.6,  # Tilts Republican
+        'R2': 0.4,  # Leans Republican
+        'R3': 0.2,  # Likely Republican
+        'R4': 0.1  # Safe Republican
     }
 ```
 
