@@ -95,11 +95,11 @@ The partisan lean is mapped to a numerical value using the `pro_values` dictiona
         'D1': 0.6,  # Tilts Democrat
         'D2': 0.4,  # Leans Democrat
         'D3': 0.2,  # Likely Democrat
-        'D4': 0.1, # Safe Democrat
+        'D4': 0.1,  # Safe Democrat
         'R1': 0.6,  # Tilts Republican
         'R2': 0.4,  # Leans Republican
         'R3': 0.2,  # Likely Republican
-        'R4': 0.1  # Safe Republican
+        'R4': 0.1   # Safe Republican
     }
 ```
 
