@@ -1,0 +1,5 @@
+services:
+  myservice:
+    type: php:8.2
+    via: nginx
+    webroot: www
