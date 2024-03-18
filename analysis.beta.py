@@ -226,6 +226,9 @@ def main():
     polling_df = apply_time_decay_weight(polling_df, decay_rate, half_life_days)
     favorability_df = apply_time_decay_weight(favorability_df, decay_rate, half_life_days)
 
+    min_samples_required = 5
+    n_trees = 1000
+
     color_index = 0
     for period in [(12, 'months'), (6, 'months'), (3, 'months'), (1, 'months'), (21, 'days'), (14, 'days'), (7, 'days'), (3, 'days'), (1, 'days')]:
         period_value, period_type = period
@@ -255,16 +258,17 @@ def main():
         X = filtered_favorability_df[features_columns].values
         y = filtered_favorability_df[target_column].values
 
-        if X.size == 0:  # Check if X is empty
-            print_with_color(f"Not enough data for prediction in {period_value} {period_type} period.", color_index)
+        if X.shape[0] < min_samples_required:
+            print_with_color(f"Not enough data for prediction in {period_value} {period_type} period. Data count: {X.shape[0]}", color_index)
         else:
-            rf = RandomForestRegressor(n_estimators=1000, oob_score=True, random_state=500, bootstrap=True)
+            rf = RandomForestRegressor(n_estimators=n_trees, oob_score=True, random_state=500, bootstrap=True)
             rf.fit(X, y)
 
             oob_predictions = np.zeros(y.shape)
             for tree in rf.estimators_:
                 unsampled_indices = _get_unsampled_indices(tree, X.shape[0])
-                oob_predictions[unsampled_indices] += tree.predict(X[unsampled_indices])
+                if len(unsampled_indices) > 0:
+                    oob_predictions[unsampled_indices] += tree.predict(X[unsampled_indices])
 
             oob_sample_counts = np.array([_get_unsampled_indices(tree, X.shape[0]).size for tree in rf.estimators_])
             oob_sample_counts = np.bincount(np.concatenate([_get_unsampled_indices(tree, X.shape[0]) for tree in rf.estimators_]))
@@ -274,7 +278,10 @@ def main():
 
             oob_variance = np.var(y - oob_predictions)
 
-            output_results(combined_results, color_index, period_value, period_type, oob_variance)
+            if np.isnan(oob_variance):
+                print_with_color(f"Insufficient data for reliable OOB variance estimation in {period_value} {period_type} period.", color_index)
+            else:
+                output_results(combined_results, color_index, period_value, period_type, oob_variance)
 
         color_index += 1
 
