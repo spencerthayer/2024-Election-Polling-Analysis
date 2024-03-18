@@ -1,5 +1,10 @@
+name: joeanddonald
+
 services:
-  myservice:
-    type: php:8.2
+  services:
+    type: php:8.0
     via: nginx
     webroot: www
+    services:
+      ports:
+        - 8888
