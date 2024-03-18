@@ -15,11 +15,6 @@ favorability_url = "https://projects.fivethirtyeight.com/polls/data/favorability
 # Data Parsing
 candidate_names = ['Joe Biden', 'Donald Trump']
 favorability_weight = 0.1
-"""
-When heavy_weight is set to True, the weights are multiplied together using np.prod(), giving more importance to the combined effect of all weights.
-
-When heavy_weight is set to False, the weights are averaged by taking the sum of the weights divided by the number of weights.
-"""
 heavy_weight = True
 
 # Coloring
@@ -69,29 +64,17 @@ def preprocess_data(df: pd.DataFrame, start_period: pd.Timestamp = None) -> pd.D
     if start_period is not None:
         df = df[df['created_at'] >= start_period]
 
-    # print("Debug: DataFrame columns after initial preprocessing:", df.columns)
-
-    # Calculate transparency_weight and sample_size_weight
     df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
     max_transparency_score = df['transparency_score'].max()
     df['transparency_weight'] = df['transparency_score'] / max_transparency_score
     min_sample_size, max_sample_size = df['sample_size'].min(), df['sample_size'].max()
     df['sample_size_weight'] = (df['sample_size'] - min_sample_size) / (max_sample_size - min_sample_size)
 
-    # print("Debug: DataFrame columns after calculating transparency_weight and sample_size_weight:", df.columns)
-
-    # Fetch state data and apply to calculate state_rank
     state_data = get_state_data()
     df['state_rank'] = df['state'].apply(lambda x: state_data.get(x, 1))
 
-    # print("Debug: DataFrame columns after calculating state_rank:", df.columns)
-
-    # Ensure 'fte_grade' is processed to calculate 'grade_weight'
     df['grade_weight'] = df['fte_grade'].map(grade_weights).fillna(0.0125)
 
-    # print("Debug: DataFrame columns after calculating grade_weight:", df.columns)
-
-    # Add population_weight column if it doesn't exist
     if 'population_weight' not in df.columns:
         if 'population' in df.columns:
             df.loc[:, 'population'] = df['population'].str.lower()
@@ -99,8 +82,6 @@ def preprocess_data(df: pd.DataFrame, start_period: pd.Timestamp = None) -> pd.D
         else:
             print("Warning: 'population' column is missing. Setting 'population_weight' to 1 for all rows.")
             df.loc[:, 'population_weight'] = 1
-
-    # print("Debug: DataFrame columns after adding population_weight:", df.columns)
 
     return df
 
@@ -132,19 +113,15 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
     Ensure percentages are handled correctly.
     """
     df = df.copy()
-    # Ensure 'pct' column values are between 0 and 100; adjust if they're between 0 and 1
     df['pct'] = df['pct'].apply(lambda x: x if x > 1 else x * 100)
 
-    # Check if 'grade_weight' needs to be calculated
     if 'grade_weight' not in df.columns:
         df['grade_weight'] = df['fte_grade'].map(grade_weights).fillna(0.0125)
 
-    # Calculate 'transparency_weight' using the filtered DataFrame
     df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
     max_transparency_score = df['transparency_score'].max()
     df['transparency_weight'] = df['transparency_score'] / max_transparency_score
 
-    # Calculate 'sample_size_weight' using the filtered DataFrame
     min_sample_size, max_sample_size = df['sample_size'].min(), df['sample_size'].max()
     df['sample_size_weight'] = (df['sample_size'] - min_sample_size) / (max_sample_size - min_sample_size)
 
@@ -153,7 +130,6 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
     df.loc[:, 'population'] = df['population'].str.lower()
     df.loc[:, 'population_weight'] = df['population'].map(lambda x: population_weights.get(x, 1))
 
-    # Fetch state data and apply to calculate state_rank
     state_data = get_state_data()
     df['state_rank'] = df['state'].apply(lambda x: state_data.get(x, 1))
 
@@ -185,10 +161,8 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
     Ensure percentages are handled correctly.
     """
     df = df.copy()
-    # Assume 'favorable' column values are between 0 and 100; adjust if they're between 0 and 1
     df['favorable'] = df['favorable'].apply(lambda x: x if x > 1 else x * 100)
 
-    # Check if 'grade_weight' needs to be calculated
     if 'grade_weight' not in df.columns:
         df['grade_weight'] = df['fte_grade'].map(grade_weights).fillna(0.0125)
 
@@ -235,7 +209,7 @@ def output_results(combined_results: Dict[str, float], color_index: int, period_
     favored_candidate = "Biden" if differential < 0 else "Trump"
     color_code = start_color + (color_index * skip_color)
     print(f"\033[38;5;{color_code}m{period_value:2d}{period_type[0]:<4} B∙{biden_score:5.2f}%±{biden_margin:.2f} T∙{trump_score:5.2f}%±{trump_margin:.2f} {abs(differential):+5.2f} {favored_candidate} 𝛂{oob_variance:5.1f}\033[0m")
-# 𝛂σ²
+
 def _get_unsampled_indices(tree, n_samples):
     # Get the indices of the OOB samples for the given tree
     unsampled_mask = np.ones(n_samples, dtype=bool)
@@ -248,8 +222,6 @@ def main():
 
     polling_df = preprocess_data(polling_df)
     favorability_df = preprocess_data(favorability_df)
-
-    # print("Debug: favorability_df columns after initial preprocessing:", favorability_df.columns)
 
     polling_df = apply_time_decay_weight(polling_df, decay_rate, half_life_days)
     favorability_df = apply_time_decay_weight(favorability_df, decay_rate, half_life_days)
@@ -267,44 +239,42 @@ def main():
         filtered_favorability_df = preprocess_data(favorability_df[(favorability_df['created_at'] >= start_period) &
                                                                     (favorability_df['politician'].isin(candidate_names))].copy(), start_period)
 
-        # print("Debug: filtered_favorability_df columns after filtering and preprocessing:", filtered_favorability_df.columns)
-
-        if 'population_weight' not in filtered_favorability_df.columns:
-            print("Error: population_weight column is missing from the DataFrame")
-            continue
+        if filtered_favorability_df.empty:
+            print_with_color(f"No data available for {period_value} {period_type}.", color_index)
+            color_index += 1
+            continue  # Skip to the next period
 
         polling_metrics = calculate_polling_metrics(filtered_polling_df, candidate_names)
         favorability_differential = calculate_favorability_differential(filtered_favorability_df, candidate_names)
 
         combined_results = combine_analysis(polling_metrics, favorability_differential, favorability_weight)
 
-        # Prepare the data for modeling
         features_columns = ['state_rank', 'population_weight', 'grade_weight']
         target_column = 'favorable'
 
         X = filtered_favorability_df[features_columns].values
         y = filtered_favorability_df[target_column].values
 
-        # Initialize and train the Random Forest model
-        rf = RandomForestRegressor(n_estimators=1000, oob_score=True, random_state=500, bootstrap=True)
-        rf.fit(X, y)
+        if X.size == 0:  # Check if X is empty
+            print_with_color(f"Not enough data for prediction in {period_value} {period_type} period.", color_index)
+        else:
+            rf = RandomForestRegressor(n_estimators=1000, oob_score=True, random_state=500, bootstrap=True)
+            rf.fit(X, y)
 
-        # Implement OOB Variance Estimation
-        oob_predictions = np.zeros(y.shape)
-        for tree in rf.estimators_:
-            unsampled_indices = _get_unsampled_indices(tree, X.shape[0])
-            oob_predictions[unsampled_indices] += tree.predict(X[unsampled_indices])
+            oob_predictions = np.zeros(y.shape)
+            for tree in rf.estimators_:
+                unsampled_indices = _get_unsampled_indices(tree, X.shape[0])
+                oob_predictions[unsampled_indices] += tree.predict(X[unsampled_indices])
 
-        oob_sample_counts = np.array([_get_unsampled_indices(tree, X.shape[0]).size for tree in rf.estimators_])
-        oob_sample_counts = np.bincount(np.concatenate([_get_unsampled_indices(tree, X.shape[0]) for tree in rf.estimators_]))
+            oob_sample_counts = np.array([_get_unsampled_indices(tree, X.shape[0]).size for tree in rf.estimators_])
+            oob_sample_counts = np.bincount(np.concatenate([_get_unsampled_indices(tree, X.shape[0]) for tree in rf.estimators_]))
 
-        epsilon = np.finfo(float).eps  # Small epsilon value to avoid division by zero
-        oob_predictions /= (oob_sample_counts + epsilon)
+            epsilon = np.finfo(float).eps  # Small epsilon value to avoid division by zero
+            oob_predictions /= (oob_sample_counts + epsilon)
 
-        oob_variance = np.var(y - oob_predictions)
+            oob_variance = np.var(y - oob_predictions)
 
-        # Integrate the OOB Variance Estimation into the Output
-        output_results(combined_results, color_index, period_value, period_type, oob_variance)
+            output_results(combined_results, color_index, period_value, period_type, oob_variance)
 
         color_index += 1
 
