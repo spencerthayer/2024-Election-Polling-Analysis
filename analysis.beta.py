@@ -7,6 +7,9 @@ from typing import Dict, List
 from states import get_state_data
 from scipy.stats import norm
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
 
 # Download the Data
 polling_url = "https://projects.fivethirtyeight.com/polls/data/president_polls.csv"
@@ -57,23 +60,43 @@ def download_csv_data(url: str) -> pd.DataFrame:
 
 def preprocess_data(df: pd.DataFrame, start_period: pd.Timestamp = None) -> pd.DataFrame:
     """
-    Preprocess the data by converting date columns, handling missing values, and filtering irrelevant data.
+    Preprocess the data by converting date columns, handling missing values, filtering irrelevant data,
+    and normalizing numeric_grade, pollscore, and transparency_score.
     """
     df['created_at'] = pd.to_datetime(df['created_at'], format='%m/%d/%y %H:%M', errors='coerce')
     df = df.dropna(subset=['created_at'])
     if start_period is not None:
         df = df[df['created_at'] >= start_period]
 
+    # Normalizing numeric_grade
+    df['numeric_grade'] = pd.to_numeric(df['numeric_grade'], errors='coerce').fillna(0)
+    max_numeric_grade = df['numeric_grade'].max()
+    df['normalized_numeric_grade'] = df['numeric_grade'] / max_numeric_grade
+
+    # Inverting and normalizing pollscore
+    df['pollscore'] = pd.to_numeric(df['pollscore'], errors='coerce')  # Ensure pollscore is float
+    min_pollscore = df['pollscore'].min()
+    max_pollscore = df['pollscore'].max()
+    df['normalized_pollscore'] = 1 - (df['pollscore'] - min_pollscore) / (max_pollscore - min_pollscore)
+
+    # Normalize transparency_score
     df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
     max_transparency_score = df['transparency_score'].max()
-    df['transparency_weight'] = df['transparency_score'] / max_transparency_score
+    df['normalized_transparency_score'] = df['transparency_score'] / max_transparency_score
+
+    # Clip the normalized values to ensure they are within [0, 1] range
+    df['normalized_numeric_grade'] = df['normalized_numeric_grade'].clip(0, 1)
+    df['normalized_pollscore'] = df['normalized_pollscore'].clip(0, 1)
+    df['normalized_transparency_score'] = df['normalized_transparency_score'].clip(0, 1)
+
+    # Combining weights with the new scores
+    df['combined_weight'] = df['normalized_numeric_grade'] * df['normalized_pollscore'] * df['normalized_transparency_score']
+
     min_sample_size, max_sample_size = df['sample_size'].min(), df['sample_size'].max()
     df['sample_size_weight'] = (df['sample_size'] - min_sample_size) / (max_sample_size - min_sample_size)
 
     state_data = get_state_data()
     df['state_rank'] = df['state'].apply(lambda x: state_data.get(x, 1))
-
-    df['grade_weight'] = df['fte_grade'].map(grade_weights).fillna(0.0125)
 
     if 'population_weight' not in df.columns:
         if 'population' in df.columns:
@@ -83,8 +106,12 @@ def preprocess_data(df: pd.DataFrame, start_period: pd.Timestamp = None) -> pd.D
             print("Warning: 'population' column is missing. Setting 'population_weight' to 1 for all rows.")
             df.loc[:, 'population_weight'] = 1
 
-    return df
+    # Print a sample of the DataFrame to validate the normalization and combined weight
+    # print("Sample of the preprocessed DataFrame:")
+    # print(df[['normalized_numeric_grade', 'normalized_pollscore', 'normalized_transparency_score', 'combined_weight']].head())
 
+    return df
+    
 def apply_time_decay_weight(df: pd.DataFrame, decay_rate: float, half_life_days: int) -> pd.DataFrame:
     """
     Apply time decay weighting to the data based on the specified decay rate and half-life.
@@ -115,9 +142,6 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
     df = df.copy()
     df['pct'] = df['pct'].apply(lambda x: x if x > 1 else x * 100)
 
-    if 'grade_weight' not in df.columns:
-        df['grade_weight'] = df['fte_grade'].map(grade_weights).fillna(0.0125)
-
     df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
     max_transparency_score = df['transparency_score'].max()
     df['transparency_weight'] = df['transparency_score'] / max_transparency_score
@@ -136,7 +160,7 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
     list_weights = np.array([
         df['time_decay_weight'],
         df['sample_size_weight'],
-        df['grade_weight'],
+        df['normalized_numeric_grade'],
         df['transparency_weight'],
         df['population_weight'],
         df['partisan_weight'],
@@ -163,16 +187,32 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
     df = df.copy()
     df['favorable'] = df['favorable'].apply(lambda x: x if x > 1 else x * 100)
 
-    if 'grade_weight' not in df.columns:
-        df['grade_weight'] = df['fte_grade'].map(grade_weights).fillna(0.0125)
+    # Normalize numeric_grade
+    df['numeric_grade'] = pd.to_numeric(df['numeric_grade'], errors='coerce').fillna(0)
+    max_numeric_grade = df['numeric_grade'].max()
+    df['normalized_numeric_grade'] = df['numeric_grade'] / max_numeric_grade
 
-    df.loc[:, 'population'] = df['population'].str.lower()
-    df.loc[:, 'population_weight'] = df['population'].map(lambda x: population_weights.get(x, 1))
+    # Invert and normalize pollscore
+    df['pollscore'] = pd.to_numeric(df['pollscore'], errors='coerce')  # Ensure pollscore is float
+    min_pollscore = df['pollscore'].min()
+    max_pollscore = df['pollscore'].max()
+    df['normalized_pollscore'] = 1 - (df['pollscore'] - min_pollscore) / (max_pollscore - min_pollscore)
 
+    # Normalize transparency_score
+    df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
+    max_transparency_score = df['transparency_score'].max()
+    df['normalized_transparency_score'] = df['transparency_score'] / max_transparency_score
+
+    # Clip the normalized values to ensure they are within [0, 1] range
+    df['normalized_numeric_grade'] = df['normalized_numeric_grade'].clip(0, 1)
+    df['normalized_pollscore'] = df['normalized_pollscore'].clip(0, 1)
+    df['normalized_transparency_score'] = df['normalized_transparency_score'].clip(0, 1)
+
+    # Utilize normalized values directly
     list_weights = np.array([
-        df['grade_weight'],
-        df['population_weight'],
-        df['time_decay_weight']
+        df['normalized_numeric_grade'],
+        df['normalized_pollscore'],
+        df['normalized_transparency_score']
     ])
     df['combined_weight'] = np.prod(list_weights, axis=0)
 
@@ -252,26 +292,34 @@ def main():
 
         combined_results = combine_analysis(polling_metrics, favorability_differential, favorability_weight)
 
-        features_columns = ['state_rank', 'population_weight', 'grade_weight']
-        target_column = 'favorable'
+        features_columns = ['normalized_numeric_grade', 'normalized_pollscore', 'normalized_transparency_score', 'sample_size_weight', 'state_rank', 'population_weight']
 
         X = filtered_favorability_df[features_columns].values
-        y = filtered_favorability_df[target_column].values
+        y = filtered_favorability_df['favorable'].values
 
         if X.shape[0] < min_samples_required:
             print_with_color(f"Not enough data for prediction in {period_value} {period_type} period. Data count: {X.shape[0]}", color_index)
         else:
-            rf = RandomForestRegressor(n_estimators=n_trees, oob_score=True, random_state=500, bootstrap=True)
-            rf.fit(X, y)
+            # Define the imputation strategy
+            imputer = SimpleImputer(strategy='median')
+
+            # Define the pipeline
+            pipeline = Pipeline(steps=[
+                ('imputer', imputer),
+                ('model', RandomForestRegressor(n_estimators=n_trees, oob_score=True, random_state=500, bootstrap=True))
+            ])
+
+            # Fit the pipeline
+            pipeline.fit(X, y)
 
             oob_predictions = np.zeros(y.shape)
-            for tree in rf.estimators_:
+            for tree in pipeline.named_steps['model'].estimators_:
                 unsampled_indices = _get_unsampled_indices(tree, X.shape[0])
                 if len(unsampled_indices) > 0:
-                    oob_predictions[unsampled_indices] += tree.predict(X[unsampled_indices])
+                    oob_predictions[unsampled_indices] += tree.predict(imputer.transform(X[unsampled_indices]))
 
-            oob_sample_counts = np.array([_get_unsampled_indices(tree, X.shape[0]).size for tree in rf.estimators_])
-            oob_sample_counts = np.bincount(np.concatenate([_get_unsampled_indices(tree, X.shape[0]) for tree in rf.estimators_]))
+            oob_sample_counts = np.array([_get_unsampled_indices(tree, X.shape[0]).size for tree in pipeline.named_steps['model'].estimators_])
+            oob_sample_counts = np.bincount(np.concatenate([_get_unsampled_indices(tree, X.shape[0]) for tree in pipeline.named_steps['model'].estimators_]))
 
             epsilon = np.finfo(float).eps  # Small epsilon value to avoid division by zero
             oob_predictions /= (oob_sample_counts + epsilon)
@@ -284,6 +332,6 @@ def main():
                 output_results(combined_results, color_index, period_value, period_type, oob_variance)
 
         color_index += 1
-
+        
 if __name__ == "__main__":
     main()
