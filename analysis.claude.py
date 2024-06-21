@@ -17,7 +17,7 @@ favorability_url = "https://projects.fivethirtyeight.com/polls/data/favorability
 
 # Data Parsing
 candidate_names = ['Joe Biden', 'Donald Trump']
-favorability_weight = 0.2
+favorability_weight = 0.1
 heavy_weight = True
 
 # Coloring
@@ -89,15 +89,15 @@ def preprocess_data(df: pd.DataFrame, start_period: pd.Timestamp = None) -> pd.D
     df['normalized_pollscore'] = df['normalized_pollscore'].clip(0, 1)
     df['normalized_transparency_score'] = df['normalized_transparency_score'].clip(0, 1)
 
-    # Combining weights with the new scores
-    df['combined_weight'] = df['normalized_numeric_grade'] * df['normalized_pollscore'] * df['normalized_transparency_score']
+    # Calculate time decay weight
+    reference_date = pd.Timestamp.now()
+    days_old = (reference_date - df['created_at']).dt.days
+    df['time_decay_weight'] = np.exp(-np.log(decay_rate) * days_old / half_life_days)
 
-    min_sample_size, max_sample_size = df['sample_size'].min(), df['sample_size'].max()
-    df['sample_size_weight'] = (df['sample_size'] - min_sample_size) / (max_sample_size - min_sample_size)
+    # Calculate transparency weight
+    df['transparency_weight'] = df['transparency_score'] / max_transparency_score
 
-    state_data = get_state_data()
-    df['state_rank'] = df['state'].apply(lambda x: state_data.get(x, 1))
-
+    # Calculate population weight
     if 'population_weight' not in df.columns:
         if 'population' in df.columns:
             df.loc[:, 'population'] = df['population'].str.lower()
@@ -106,12 +106,20 @@ def preprocess_data(df: pd.DataFrame, start_period: pd.Timestamp = None) -> pd.D
             print("Warning: 'population' column is missing. Setting 'population_weight' to 1 for all rows.")
             df.loc[:, 'population_weight'] = 1
 
-    # Print a sample of the DataFrame to validate the normalization and combined weight
-    # print("Sample of the preprocessed DataFrame:")
-    # print(df[['normalized_numeric_grade', 'normalized_pollscore', 'normalized_transparency_score', 'combined_weight']].head())
+    # Calculate partisan weight
+    df.loc[:, 'is_partisan'] = df['partisan'].notna() & df['partisan'].ne('')
+    df.loc[:, 'partisan_weight'] = df['is_partisan'].map(partisan_weight)
+
+    # Calculate sample size weight
+    min_sample_size, max_sample_size = df['sample_size'].min(), df['sample_size'].max()
+    df['sample_size_weight'] = (df['sample_size'] - min_sample_size) / (max_sample_size - min_sample_size)
+
+    # Calculate state rank weight (added here)
+    state_data = get_state_data()  # Assuming get_state_data() is defined elsewhere
+    df['state_rank'] = df['state'].apply(lambda x: state_data.get(x, 1))
 
     return df
-    
+
 def apply_time_decay_weight(df: pd.DataFrame, decay_rate: float, half_life_days: int) -> pd.DataFrame:
     """
     Apply time decay weighting to the data based on the specified decay rate and half-life.
@@ -282,10 +290,10 @@ def main():
         filtered_favorability_df = preprocess_data(favorability_df[(favorability_df['created_at'] >= start_period) &
                                                                     (favorability_df['politician'].isin(candidate_names))].copy(), start_period)
 
-        # if filtered_favorability_df.empty:
-        #     print_with_color(f"No data available for {period_value} {period_type}.", color_index)
-        #     color_index += 1
-        #     continue  # Skip to the next period
+        if filtered_favorability_df.empty:
+            print_with_color(f"No data available for {period_value} {period_type}.", color_index)
+            color_index += 1
+            continue  # Skip to the next period
 
         polling_metrics = calculate_polling_metrics(filtered_polling_df, candidate_names)
         favorability_differential = calculate_favorability_differential(filtered_favorability_df, candidate_names)
@@ -306,7 +314,7 @@ def main():
             # Define the pipeline
             pipeline = Pipeline(steps=[
                 ('imputer', imputer),
-                ('model', RandomForestRegressor(n_estimators=n_trees, oob_score=True, random_state=5000, bootstrap=True))
+                ('model', RandomForestRegressor(n_estimators=n_trees, oob_score=True, random_state=500, bootstrap=True))
             ])
 
             # Fit the pipeline

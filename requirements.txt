@@ -1,5 +1,6 @@
-pandas>=1.2.0
-requests>=2.25.0
-numpy>=1.19.0
-scipy>=1.5.4
-scikit-learn>=0.24.1
+pandas
+requests
+numpy
+scipy
+scikit-learn
+beautifulsoup4
