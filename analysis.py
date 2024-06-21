@@ -9,7 +9,7 @@ from scipy.stats import norm
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import FunctionTransformer
 
 # Download the Data
 polling_url = "https://projects.fivethirtyeight.com/polls/data/president_polls.csv"
@@ -106,12 +106,8 @@ def preprocess_data(df: pd.DataFrame, start_period: pd.Timestamp = None) -> pd.D
             print("Warning: 'population' column is missing. Setting 'population_weight' to 1 for all rows.")
             df.loc[:, 'population_weight'] = 1
 
-    # Print a sample of the DataFrame to validate the normalization and combined weight
-    # print("Sample of the preprocessed DataFrame:")
-    # print(df[['normalized_numeric_grade', 'normalized_pollscore', 'normalized_transparency_score', 'combined_weight']].head())
-
     return df
-    
+
 def apply_time_decay_weight(df: pd.DataFrame, decay_rate: float, half_life_days: int) -> pd.DataFrame:
     """
     Apply time decay weighting to the data based on the specified decay rate and half-life.
@@ -126,13 +122,12 @@ def calculate_timeframe_specific_moe(df, candidate_names):
     for candidate in candidate_names:
         candidate_df = df[df['candidate_name'] == candidate]
         if candidate_df.empty:
-            # Skip this candidate if there are no polls
             continue
         for _, poll in candidate_df.iterrows():
-            if poll['sample_size'] > 0 and 0 <= poll['pct'] <= 100:  # Ensuring sample size and percentage are valid
+            if poll['sample_size'] > 0 and 0 <= poll['pct'] <= 100:
                 moe = margin_of_error(n=poll['sample_size'], p=poll['pct']/100)
                 moes.append(moe)
-    return np.mean(moes) if moes else np.nan  # Only return a mean if there are MOE values to average
+    return np.mean(moes) if moes else np.nan
 
 def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> Dict[str, float]:
     """
@@ -187,28 +182,23 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
     df = df.copy()
     df['favorable'] = df['favorable'].apply(lambda x: x if x > 1 else x * 100)
 
-    # Normalize numeric_grade
     df['numeric_grade'] = pd.to_numeric(df['numeric_grade'], errors='coerce').fillna(0)
     max_numeric_grade = df['numeric_grade'].max()
     df['normalized_numeric_grade'] = df['numeric_grade'] / max_numeric_grade
 
-    # Invert and normalize pollscore
-    df['pollscore'] = pd.to_numeric(df['pollscore'], errors='coerce')  # Ensure pollscore is float
+    df['pollscore'] = pd.to_numeric(df['pollscore'], errors='coerce')
     min_pollscore = df['pollscore'].min()
     max_pollscore = df['pollscore'].max()
     df['normalized_pollscore'] = 1 - (df['pollscore'] - min_pollscore) / (max_pollscore - min_pollscore)
 
-    # Normalize transparency_score
     df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
     max_transparency_score = df['transparency_score'].max()
     df['normalized_transparency_score'] = df['transparency_score'] / max_transparency_score
 
-    # Clip the normalized values to ensure they are within [0, 1] range
     df['normalized_numeric_grade'] = df['normalized_numeric_grade'].clip(0, 1)
     df['normalized_pollscore'] = df['normalized_pollscore'].clip(0, 1)
     df['normalized_transparency_score'] = df['normalized_transparency_score'].clip(0, 1)
 
-    # Utilize normalized values directly
     list_weights = np.array([
         df['normalized_numeric_grade'],
         df['normalized_pollscore'],
@@ -251,10 +241,18 @@ def output_results(combined_results: Dict[str, float], color_index: int, period_
     print(f"\033[38;5;{color_code}m{period_value:2d}{period_type[0]:<4} B∙{biden_score:5.2f}%±{biden_margin:.2f} T∙{trump_score:5.2f}%±{trump_margin:.2f} {abs(differential):+5.2f} {favored_candidate} 𝛂{oob_variance:5.1f}\033[0m")
 
 def _get_unsampled_indices(tree, n_samples):
-    # Get the indices of the OOB samples for the given tree
+    """Retrieves indices of out-of-bag samples for a given tree."""
     unsampled_mask = np.ones(n_samples, dtype=bool)
     unsampled_mask[tree.tree_.feature[tree.tree_.feature >= 0]] = False
     return np.arange(n_samples)[unsampled_mask]
+
+def impute_data(X):
+    """Imputes data for each column separately, only if the column has non-missing values."""
+    imputer = SimpleImputer(strategy='median')
+    for col in range(X.shape[1]):
+        if np.any(~np.isnan(X[:, col])):
+            X[:, col] = imputer.fit_transform(X[:, col].reshape(-1, 1)).ravel()
+    return X
 
 def main():
     polling_df = download_csv_data(polling_url)
@@ -282,11 +280,6 @@ def main():
         filtered_favorability_df = preprocess_data(favorability_df[(favorability_df['created_at'] >= start_period) &
                                                                     (favorability_df['politician'].isin(candidate_names))].copy(), start_period)
 
-        # if filtered_favorability_df.empty:
-        #     print_with_color(f"No data available for {period_value} {period_type}.", color_index)
-        #     color_index += 1
-        #     continue  # Skip to the next period
-
         polling_metrics = calculate_polling_metrics(filtered_polling_df, candidate_names)
         favorability_differential = calculate_favorability_differential(filtered_favorability_df, candidate_names)
 
@@ -300,38 +293,35 @@ def main():
         if X.shape[0] < min_samples_required:
             print_with_color(f"Not enough data for prediction in {period_value} {period_type} period. Data count: {X.shape[0]}", color_index)
         else:
-            # Define the imputation strategy
-            imputer = SimpleImputer(strategy='median')
-
-            # Define the pipeline
+            # Create the pipeline with imputation
             pipeline = Pipeline(steps=[
-                ('imputer', imputer),
+                ('imputer', FunctionTransformer(impute_data)), 
                 ('model', RandomForestRegressor(n_estimators=n_trees, oob_score=True, random_state=5000, bootstrap=True))
             ])
 
-            # Fit the pipeline
             pipeline.fit(X, y)
 
             oob_predictions = np.zeros(y.shape)
+            oob_sample_counts = np.zeros(X.shape[0], dtype=int) # Initialize counts here
+
             for tree in pipeline.named_steps['model'].estimators_:
                 unsampled_indices = _get_unsampled_indices(tree, X.shape[0])
                 if len(unsampled_indices) > 0:
-                    oob_predictions[unsampled_indices] += tree.predict(imputer.transform(X[unsampled_indices]))
+                    oob_predictions[unsampled_indices] += tree.predict(impute_data(X[unsampled_indices])) # Using function name directly
+                    oob_sample_counts[unsampled_indices] += 1 # Update counts in the same loop 
 
-            oob_sample_counts = np.array([_get_unsampled_indices(tree, X.shape[0]).size for tree in pipeline.named_steps['model'].estimators_])
-            oob_sample_counts = np.bincount(np.concatenate([_get_unsampled_indices(tree, X.shape[0]) for tree in pipeline.named_steps['model'].estimators_]))
-
-            epsilon = np.finfo(float).eps  # Small epsilon value to avoid division by zero
+            epsilon = np.finfo(float).eps  
             oob_predictions /= (oob_sample_counts + epsilon)
 
             oob_variance = np.var(y - oob_predictions)
 
-            if np.isnan(oob_variance):
-                print_with_color(f"Insufficient data for reliable OOB variance estimation in {period_value} {period_type} period.", color_index)
+            # Check for NaN in oob_variance and data sufficiency here
+            if np.isnan(oob_variance) or X.shape[0] < min_samples_required: 
+                print_with_color(f"Not enough data for prediction in {period_value} {period_type} period.", color_index)
             else:
                 output_results(combined_results, color_index, period_value, period_type, oob_variance)
 
         color_index += 1
-        
+
 if __name__ == "__main__":
     main()
