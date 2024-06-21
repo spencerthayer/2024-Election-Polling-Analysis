@@ -4,7 +4,7 @@
 PROJECT_DIR="/Users/spencerthayer/Documents/Work/Election-Polling"
 VENV_DIR="$PROJECT_DIR/venv"
 REQUIREMENTS_FILE="$PROJECT_DIR/requirements.txt"
-PYTHON_SCRIPT="$PROJECT_DIR/analysis.beta.py"
+PYTHON_SCRIPT="$PROJECT_DIR/analysis.py"
 
 # Navigate to the project directory
 cd $PROJECT_DIR
