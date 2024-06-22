@@ -166,9 +166,13 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
     else:
         df['combined_weight'] = sum(list_weights) / len(list_weights)
 
-    weighted_sums = df.groupby('candidate_name')['combined_weight'].apply(lambda x: (x * df.loc[x.index, 'pct']).sum())
-    total_weights = df.groupby('candidate_name')['combined_weight'].sum()
-    weighted_averages = (weighted_sums / total_weights)
+    weighted_sums = df.groupby('candidate_name')['combined_weight'].apply(lambda x: (x * df.loc[x.index, 'pct']).sum()).fillna(0)
+    total_weights = df.groupby('candidate_name')['combined_weight'].sum().fillna(0)
+
+    print("weighted_sums:", weighted_sums)  # Debugging print
+    print("total_weights:", total_weights)  # Debugging print
+
+    weighted_averages = (weighted_sums / total_weights).fillna(0)  # Handle NaN
 
     weighted_margins = {candidate: calculate_timeframe_specific_moe(df, [candidate]) for candidate in candidate_names}
 
@@ -206,9 +210,14 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
     ])
     df['combined_weight'] = np.prod(list_weights, axis=0)
 
-    weighted_sums = df.groupby('politician')['combined_weight'].apply(lambda x: (x * df.loc[x.index, 'favorable']).sum())
-    total_weights = df.groupby('politician')['combined_weight'].sum()
-    weighted_averages = (weighted_sums / total_weights)
+    weighted_sums = df.groupby('politician')['combined_weight'].apply(lambda x: (x * df.loc[x.index, 'favorable']).sum()).fillna(0)
+    total_weights = df.groupby('politician')['combined_weight'].sum().fillna(0)
+
+    print("weighted_sums (favorability):", weighted_sums)  # Debugging print
+    print("total_weights (favorability):", total_weights)  # Debugging print
+
+    weighted_averages = (weighted_sums / total_weights).fillna(0)  # Handle NaN
+
     return {candidate: weighted_averages.get(candidate, 0) for candidate in candidate_names}
 
 def combine_analysis(polling_metrics: Dict[str, float], favorability_differential: Dict[str, float], favorability_weight: float) -> Dict[str, float]:
