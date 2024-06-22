@@ -4,7 +4,7 @@ This Python project is designed to fetch, process, and analyze presidential poll
 
 ## Data Acquisition
 
-Presidential Polling Data: Sourced from [FiveThirtyEight](https://projects.fivethirtyeight.com/), this dataset is accessed via the Python `Requests` ~library, ensuring real-time relevance by incorporating the latest available data into a `Pandas` DataFrame for subsequent analysis.
+Presidential Polling Data: Sourced from [FiveThirtyEight](https://projects.fivethirtyeight.com/), this dataset is accessed via the Python `Requests` library, ensuring real-time relevance by incorporating the latest available data into a `Pandas` DataFrame for subsequent analysis.
 
 Favorability Polling Data: Complementing presidential polling, [FiveThirtyEight](https://projects.fivethirtyeight.com/)'s favorability data offers insight into public sentiment regarding candidates, fetched similarly and integrated into the analysis to enhance depth.
 
@@ -154,7 +154,7 @@ To calculate the adjusted poll results for each candidate, the script follows th
 3. Compute the combined weight for each poll using the selected method (`heavy_weight` or average).
 4. Calculate the weighted sum of poll results for each candidate by multiplying the poll result percentage by the combined weight.
 5. Sum the weighted poll results for each candidate.
-6. Divide the weighted sum by the total combined weights for each candidate to obtain the weighted average poll result.
+6. Divide the weighted sum by the total combined weights for each candidate to obtain the weighted average poll result. This step includes careful handling of potential `NaN` (Not a Number) values that might arise due to missing data. `NaN` values are replaced with 0 to prevent them from propagating through calculations and causing errors.
 7. Calculate the margin of error for each candidate's poll results using the `margin_of_error` function, which takes into account the sample size and poll result percentage.
 8. Return a dictionary containing the weighted average poll result and margin of error for each candidate.
 
@@ -173,7 +173,7 @@ To incorporate favorability polling data into the analysis, the script calculate
 3. Compute the combined weight for each poll by multiplying the individual weights.
 4. Calculate the weighted sum of favorability percentages for each candidate by multiplying the favorability percentage by the combined weight.
 5. Sum the weighted favorability percentages for each candidate.
-6. Divide the weighted sum by the total combined weights for each candidate to obtain the weighted average favorability percentage.
+6. Divide the weighted sum by the total combined weights for each candidate to obtain the weighted average favorability percentage. This step, like in the polling metrics calculation, includes robust handling of potential `NaN` values.
 7. Return a dictionary containing the weighted average favorability percentage for each candidate.
 
 ### 11. Combining Polling Metrics and Favorability Differential
@@ -186,21 +186,7 @@ Where $\alpha$ is the `favorability_weight` parameter that determines the relati
 
 The margin of error for the combined result is directly obtained from the polling metrics.
 
-## Output
-
-The `analysis.py` script processes the polling and favorability data for different time periods (e.g., 12 months, 6 months, 3 months, 21 days, 14 days, 7 days, 3 days, and 1 day) and prints the analyzed results for each period. The output includes the weighted averages and margins of error for each candidate, `Biden` and `Trump`, the differential between them, and the favored candidate based on the differential. The output is color-coded based on the time period to provide a visual representation of the trends.
-
-## Conclusion
-
-By incorporating favorability data, state-specific weights, and various other factors into the analysis, this project provides a nuanced and comprehensive assessment of presidential polling data. The integration of data from `states.py` allows for the consideration of each state's unique electoral dynamics, ensuring that the adjusted poll results reflect the significance and political leanings of individual states.
-
-This approach aims to strike a balance between the broad insights provided by national polls, the detailed, state-specific information captured by local polls, and the additional context provided by favorability ratings. By carefully normalizing and combining these various weights, the scripts produce adjusted results that offer a more accurate and representative picture of the current state of the presidential race.
-
-As with any polling analysis, there is always room for further refinement and improvement. The modular design of the scripts allows for the incorporation of additional factors and adjustments as needed. Collaboration and feedback from the community are welcome to enhance the methodology and ensure the most accurate and meaningful analysis possible.
-
----
-
-### Out-of-Bag (OOB) Random Forest Implementation (Beta Test)
+## Out-of-Bag (OOB) Random Forest Implementation (Beta Test)
 
 The `analysis.py` script incorporates an Out-of-Bag (OOB) Random Forest implementation to estimate the variance of the model's predictions. This approach leverages the inherent properties of Random Forests, where each tree is trained on a different bootstrap sample of the data, and the samples not included in the bootstrap sample (i.e., left out of the bag) are used to calculate the OOB error or variance.
 
@@ -231,18 +217,13 @@ $$ \sigma_{OOB}^2 = \frac{1}{N} \sum_{i=1}^N (y_i - \hat{y}_i^{OOB})^2 $$
 In the `analysis.py` script, the OOB variance estimation is implemented as follows:
 
 1. The Random Forest model is initialized with `n_estimators=100` (number of trees), `oob_score=True` (to enable OOB scoring), `random_state=42` (for reproducibility), and `bootstrap=True` (to perform bootstrap sampling).
-
-2. The model is trained on the input features `X` and target variable `y` using the `fit()` method.
-
-3. The `_get_unsampled_indices()` function is defined to retrieve the indices of the OOB samples for each tree in the forest.
-
-4. The OOB predictions are calculated by iterating over each tree in the forest, obtaining the unsampled indices using `_get_unsampled_indices()`, and accumulating the predictions for the OOB samples.
-
-5. The OOB sample counts are computed using `np.bincount()` to determine the number of times each sample was included in the OOB sets.
-
-6. The OOB predictions are divided by the OOB sample counts (with a small epsilon value added to avoid division by zero) to obtain the final OOB predictions.
-
-7. The OOB variance is calculated using the formula: $\sigma_{OOB}^2 = \text{Var}(y - \hat{y}^{OOB})$, where $y$ represents the true target values and $\hat{y}^{OOB}$ represents the OOB predictions.
+2. The `impute_data(X)` function handles potential missing data during the OOB estimation by imputing missing values with the median of the corresponding feature.
+3. The model is trained on the input features `X` and target variable `y` using the `fit()` method within a `Pipeline`, which includes the `impute_data` function to handle potential missing values.
+4. The `_get_unsampled_indices()` function is defined to retrieve the indices of the OOB samples for each tree in the forest.
+5. The OOB predictions are calculated by iterating over each tree in the forest, obtaining the unsampled indices using `_get_unsampled_indices()`, and accumulating the predictions for the OOB samples.
+6. The OOB sample counts are computed using `np.bincount()` to determine the number of times each sample was included in the OOB sets.
+7. The OOB predictions are divided by the OOB sample counts (with a small epsilon value added to avoid division by zero) to obtain the final OOB predictions.
+8. The OOB variance is calculated using the formula: $\sigma_{OOB}^2 = \text{Var}(y - \hat{y}^{OOB})$, where $y$ represents the true target values and $\hat{y}^{OOB}$ represents the OOB predictions.
 
 #### Interpretation and Implications
 
@@ -257,6 +238,27 @@ The OOB variance provides insights into the variability and reliability of the R
 4. **Predictive Power and Uncertainty**: The OOB results, when combined with the predicted percentages (e.g., B:41.55% vs. T:44.15%), provide a more comprehensive understanding of the model's predictive power and the uncertainty associated with those predictions. The variance measures how much the model's predictions for the outcome (favorability or voting percentages) might vary, adding a layer of understanding to the confidence in the model's output.
 
 The OOB variance should be used as a tool for model evaluation alongside other metrics, guiding model improvement efforts, informing decision-making, and monitoring temporal dynamics. It offers valuable insights into the reliability and stability of the Random Forest model's predictions, aiding in the interpretation and utilization of the model's outputs.
+
+## Error Handling
+
+The script incorporates robust error handling to address various potential issues, particularly related to missing or incomplete data. Here's a summary of the error handling strategies implemented:
+
+- **Data Download Errors:** The `download_csv_data` function uses a `try-except` block to catch potential errors during data download, such as network issues or invalid URLs. If an error occurs, the script prints an error message and returns an empty DataFrame to prevent the script from crashing.
+- **Missing 'Population' Column:** The `preprocess_data` function includes a warning message if the 'population' column is missing from the DataFrame. In this case, the 'population_weight' is set to 1 for all rows.
+- **Missing Values in Calculations:**  The `calculate_polling_metrics` and `calculate_favorability_differential` functions use `.fillna(0)` to replace `NaN` values that might arise during intermediate calculations (e.g., in `weighted_sums` or `total_weights`). This prevents `NaN` values from propagating through the calculations and ensures that the script produces numerical outputs even if there are missing values.
+- **Insufficient Data for OOB Estimation:** The script checks for sufficient data both before and after the OOB variance calculation. If there are not enough samples for reliable estimation (`X.shape[0] < min_samples_required`), the script prints an informative message indicating that there is insufficient data for the specific time period. This is done to handle cases where the `NaN` values might originate from the OOB estimation process itself, even if there was enough initial data.
+
+## Output
+
+The `analysis.py` script processes the polling and favorability data for different time periods (e.g., 12 months, 6 months, 3 months, 21 days, 14 days, 7 days, 3 days, and 1 day) and prints the analyzed results for each period. The output includes the weighted averages and margins of error for each candidate, `Biden` and `Trump`, the differential between them, and the favored candidate based on the differential. The output is color-coded based on the time period to provide a visual representation of the trends.
+
+## Conclusion
+
+By incorporating favorability data, state-specific weights, and various other factors into the analysis, this project provides a nuanced and comprehensive assessment of presidential polling data. The integration of data from `states.py` allows for the consideration of each state's unique electoral dynamics, ensuring that the adjusted poll results reflect the significance and political leanings of individual states.
+
+This approach aims to strike a balance between the broad insights provided by national polls, the detailed, state-specific information captured by local polls, and the additional context provided by favorability ratings. By carefully normalizing and combining these various weights, the scripts produce adjusted results that offer a more accurate and representative picture of the current state of the presidential race.
+
+As with any polling analysis, there is always room for further refinement and improvement. The modular design of the scripts allows for the incorporation of additional factors and adjustments as needed. Collaboration and feedback from the community are welcome to enhance the methodology and ensure the most accurate and meaningful analysis possible.
 
 ---
 
