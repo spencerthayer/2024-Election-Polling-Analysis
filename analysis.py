@@ -17,7 +17,7 @@ favorability_url = "https://projects.fivethirtyeight.com/polls/data/favorability
 
 # Data Parsing
 candidate_names = ['Joe Biden', 'Donald Trump']
-favorability_weight = 0.1
+favorability_weight = 0.1  # Global value, but will be overridden when needed
 heavy_weight = True
 
 # Coloring
@@ -29,11 +29,6 @@ decay_rate = 2
 half_life_days = 28
 
 # Constants for the weighting calculations
-grade_weights = {
-    'A+': 1.0, 'A': 0.9, 'A-': 0.8, 'A/B': 0.75, 'B+': 0.7,
-    'B': 0.6, 'B-': 0.5, 'B/C': 0.45, 'C+': 0.4, 'C': 0.3,
-    'C-': 0.2, 'C/D': 0.15, 'D+': 0.1, 'D': 0.05, 'D-': 0.025
-}
 partisan_weight = {True: 0.1, False: 1}
 population_weights = {
     'lv': 1.0, 'rv': 0.6666666666666666, 'v': 0.5,
@@ -326,7 +321,7 @@ def main():
 
             else: # Not enough favorability data, use only polling
                 print_with_color(f"Using only polling data for {period_value} {period_type} period.", color_index)
-                combined_results = combine_analysis(polling_metrics, {}, favorability_weight)  # Empty favorability_differential
+                combined_results = combine_analysis(polling_metrics, {}, 0.0)  # Pass 0.0 as favorability_weight
                 output_results(combined_results, color_index, period_value, period_type, oob_variance=0)  # Set OOB variance to 0 
         else:
             print_with_color(f"Not enough data for prediction in {period_value} {period_type} period. Data count: {filtered_polling_df.shape[0]}", color_index)
