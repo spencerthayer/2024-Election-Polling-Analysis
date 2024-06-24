@@ -169,9 +169,6 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
     weighted_sums = df.groupby('candidate_name')['combined_weight'].apply(lambda x: (x * df.loc[x.index, 'pct']).sum()).fillna(0)
     total_weights = df.groupby('candidate_name')['combined_weight'].sum().fillna(0)
 
-    print("weighted_sums:", weighted_sums)  # Debugging print
-    print("total_weights:", total_weights)  # Debugging print
-
     weighted_averages = (weighted_sums / total_weights).fillna(0)  # Handle NaN
 
     weighted_margins = {candidate: calculate_timeframe_specific_moe(df, [candidate]) for candidate in candidate_names}
@@ -213,9 +210,6 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
     weighted_sums = df.groupby('politician')['combined_weight'].apply(lambda x: (x * df.loc[x.index, 'favorable']).sum()).fillna(0)
     total_weights = df.groupby('politician')['combined_weight'].sum().fillna(0)
 
-    print("weighted_sums (favorability):", weighted_sums)  # Debugging print
-    print("total_weights (favorability):", total_weights)  # Debugging print
-
     weighted_averages = (weighted_sums / total_weights).fillna(0)  # Handle NaN
 
     return {candidate: weighted_averages.get(candidate, 0) for candidate in candidate_names}
@@ -223,11 +217,13 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
 def combine_analysis(polling_metrics: Dict[str, float], favorability_differential: Dict[str, float], favorability_weight: float) -> Dict[str, float]:
     """
     Combine polling metrics and favorability differentials into a unified analysis.
+    Handles cases where favorability_differential might be empty.
     """
     combined_metrics = {}
     for candidate in polling_metrics.keys():
+        fav_diff = favorability_differential.get(candidate, 0)  # Get favorability, default to 0 if not available
         combined_metrics[candidate] = (
-            polling_metrics[candidate][0] * (1 - favorability_weight) + favorability_differential[candidate] * favorability_weight,
+            polling_metrics[candidate][0] * (1 - favorability_weight) + fav_diff * favorability_weight,
             polling_metrics[candidate][1]
         )
     return combined_metrics
@@ -289,46 +285,51 @@ def main():
         filtered_favorability_df = preprocess_data(favorability_df[(favorability_df['created_at'] >= start_period) &
                                                                     (favorability_df['politician'].isin(candidate_names))].copy(), start_period)
 
-        polling_metrics = calculate_polling_metrics(filtered_polling_df, candidate_names)
-        favorability_differential = calculate_favorability_differential(filtered_favorability_df, candidate_names)
+        # Check for sufficient polling data
+        if filtered_polling_df.shape[0] >= min_samples_required: 
+            polling_metrics = calculate_polling_metrics(filtered_polling_df, candidate_names)
+            
+            # Check for sufficient favorability data
+            if filtered_favorability_df.shape[0] >= min_samples_required:
+                favorability_differential = calculate_favorability_differential(filtered_favorability_df, candidate_names)
 
-        combined_results = combine_analysis(polling_metrics, favorability_differential, favorability_weight)
+                combined_results = combine_analysis(polling_metrics, favorability_differential, favorability_weight)
 
-        features_columns = ['normalized_numeric_grade', 'normalized_pollscore', 'normalized_transparency_score', 'sample_size_weight', 'state_rank', 'population_weight']
+                features_columns = ['normalized_numeric_grade', 'normalized_pollscore', 'normalized_transparency_score', 'sample_size_weight', 'state_rank', 'population_weight']
 
-        X = filtered_favorability_df[features_columns].values
-        y = filtered_favorability_df['favorable'].values
+                X = filtered_favorability_df[features_columns].values
+                y = filtered_favorability_df['favorable'].values
+                
+                # Create the pipeline with imputation
+                pipeline = Pipeline(steps=[
+                    ('imputer', FunctionTransformer(impute_data)), 
+                    ('model', RandomForestRegressor(n_estimators=n_trees, oob_score=True, random_state=5000, bootstrap=True))
+                ])
 
-        if X.shape[0] < min_samples_required:
-            print_with_color(f"Not enough data for prediction in {period_value} {period_type} period. Data count: {X.shape[0]}", color_index)
-        else:
-            # Create the pipeline with imputation
-            pipeline = Pipeline(steps=[
-                ('imputer', FunctionTransformer(impute_data)), 
-                ('model', RandomForestRegressor(n_estimators=n_trees, oob_score=True, random_state=5000, bootstrap=True))
-            ])
+                pipeline.fit(X, y)
 
-            pipeline.fit(X, y)
+                oob_predictions = np.zeros(y.shape)
+                oob_sample_counts = np.zeros(X.shape[0], dtype=int) # Initialize counts here
 
-            oob_predictions = np.zeros(y.shape)
-            oob_sample_counts = np.zeros(X.shape[0], dtype=int) # Initialize counts here
+                for tree in pipeline.named_steps['model'].estimators_:
+                    unsampled_indices = _get_unsampled_indices(tree, X.shape[0])
+                    if len(unsampled_indices) > 0:
+                        oob_predictions[unsampled_indices] += tree.predict(impute_data(X[unsampled_indices])) # Using function name directly
+                        oob_sample_counts[unsampled_indices] += 1 # Update counts in the same loop 
 
-            for tree in pipeline.named_steps['model'].estimators_:
-                unsampled_indices = _get_unsampled_indices(tree, X.shape[0])
-                if len(unsampled_indices) > 0:
-                    oob_predictions[unsampled_indices] += tree.predict(impute_data(X[unsampled_indices])) # Using function name directly
-                    oob_sample_counts[unsampled_indices] += 1 # Update counts in the same loop 
+                epsilon = np.finfo(float).eps  
+                oob_predictions /= (oob_sample_counts + epsilon)
 
-            epsilon = np.finfo(float).eps  
-            oob_predictions /= (oob_sample_counts + epsilon)
+                oob_variance = np.var(y - oob_predictions)
 
-            oob_variance = np.var(y - oob_predictions)
-
-            # Check for NaN in oob_variance and data sufficiency here
-            if np.isnan(oob_variance) or X.shape[0] < min_samples_required: 
-                print_with_color(f"Not enough data for prediction in {period_value} {period_type} period.", color_index)
-            else:
                 output_results(combined_results, color_index, period_value, period_type, oob_variance)
+
+            else: # Not enough favorability data, use only polling
+                print_with_color(f"Using only polling data for {period_value} {period_type} period.", color_index)
+                combined_results = combine_analysis(polling_metrics, {}, favorability_weight)  # Empty favorability_differential
+                output_results(combined_results, color_index, period_value, period_type, oob_variance=0)  # Set OOB variance to 0 
+        else:
+            print_with_color(f"Not enough data for prediction in {period_value} {period_type} period. Data count: {filtered_polling_df.shape[0]}", color_index)
 
         color_index += 1
 
