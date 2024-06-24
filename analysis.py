@@ -17,7 +17,7 @@ favorability_url = "https://projects.fivethirtyeight.com/polls/data/favorability
 
 # Data Parsing
 candidate_names = ['Joe Biden', 'Donald Trump']
-favorability_weight = 0.2
+favorability_weight = 0.1
 heavy_weight = True
 
 # Coloring
