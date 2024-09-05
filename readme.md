@@ -149,7 +149,7 @@ Where $n$ is the number of individual weights.
 
 To calculate the adjusted poll results for each candidate, the script follows these steps:
 
-1. Filter the polling data for the desired time period (e.g., last 12 months, last 6 months, etc.) and candidates (Joe Biden and Donald Trump).
+1. Filter the polling data for the desired time period (e.g., last 12 months, last 6 months, etc.) and candidates (Kamala Harris and Donald Trump).
 2. Calculate the individual weights for each poll based on the factors mentioned above.
 3. Compute the combined weight for each poll using the selected method (`heavy_weight` or average).
 4. Calculate the weighted sum of poll results for each candidate by multiplying the poll result percentage by the combined weight.
@@ -250,7 +250,7 @@ The script incorporates robust error handling to address various potential issue
 
 ## Output
 
-The `analysis.py` script processes the polling and favorability data for different time periods (e.g., 12 months, 6 months, 3 months, 21 days, 14 days, 7 days, 3 days, and 1 day) and prints the analyzed results for each period. The output includes the weighted averages and margins of error for each candidate, `Biden` and `Trump`, the differential between them, and the favored candidate based on the differential. The output is color-coded based on the time period to provide a visual representation of the trends.
+The `analysis.py` script processes the polling and favorability data for different time periods (e.g., 12 months, 6 months, 3 months, 21 days, 14 days, 7 days, 3 days, and 1 day) and prints the analyzed results for each period. The output includes the weighted averages and margins of error for each candidate, `Harris` and `Trump`, the differential between them, and the favored candidate based on the differential. The output is color-coded based on the time period to provide a visual representation of the trends.
 
 ## Conclusion
 
