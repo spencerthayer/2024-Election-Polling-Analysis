@@ -1,6 +1,8 @@
+altair
+beautifulsoup4
+numpy
 pandas
 requests
-numpy
-scipy
 scikit-learn
-beautifulsoup4
+scipy
+streamlit

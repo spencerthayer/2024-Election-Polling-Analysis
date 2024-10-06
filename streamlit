@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# Define the absolute path to your project directory
+PROJECT_DIR="/Users/spencerthayer/Documents/Work/Election-Polling"
+VENV_DIR="$PROJECT_DIR/venv"
+REQUIREMENTS_FILE="$PROJECT_DIR/requirements.txt"
+STREAMLIT_SCRIPT="$PROJECT_DIR/app.py"
+PID_FILE="$PROJECT_DIR/.streamlit.pid"
+
+# Function to start Streamlit
+start_streamlit() {
+    # Navigate to the project directory
+    cd $PROJECT_DIR
+
+    # Check if the virtual environment directory exists
+    if [ ! -d "$VENV_DIR" ]; then
+        echo "Virtual environment not found. Creating one..."
+        python3 -m venv $VENV_DIR
+        
+        echo "Activating virtual environment..."
+        source $VENV_DIR/bin/activate
+        
+        if [ -f "$REQUIREMENTS_FILE" ]; then
+            echo "Installing requirements..."
+            pip install -r $REQUIREMENTS_FILE
+        else
+            echo "Requirements file not found. Skipping installation."
+        fi
+    else
+        echo "Virtual environment found. Activating..."
+        source $VENV_DIR/bin/activate
+    fi
+
+    # Check if Streamlit is already running
+    if [ -f "$PID_FILE" ]; then
+        echo "Streamlit is already running."
+        return
+    fi
+
+    # Run the Streamlit application
+    echo "Starting Streamlit application..."
+    streamlit run $STREAMLIT_SCRIPT &
+    echo $! > $PID_FILE
+    echo "Streamlit application started. PID: $(cat $PID_FILE)"
+}
+
+# Function to stop Streamlit
+stop_streamlit() {
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat $PID_FILE)
+        echo "Stopping Streamlit application (PID: $PID)..."
+        kill $PID
+        rm $PID_FILE
+        echo "Streamlit application stopped."
+    else
+        echo "No running Streamlit application found."
+    fi
+}
+
+# Main script logic
+case "$1" in
+    on)
+        start_streamlit
+        ;;
+    off)
+        stop_streamlit
+        ;;
+    *)
+        echo "Usage: $0 {on|off}"
+        exit 1
+        ;;
+esac
+
+exit 0
