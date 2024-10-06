@@ -2,6 +2,18 @@
 
 This Python project is designed to fetch, process, and analyze presidential polling data. It consists of two main scripts: `analysis.py` and `states.py`. The `analysis.py` script fetches data from [FiveThirtyEight](https://projects.fivethirtyeight.com/)'s publicly available CSV files for [presidential polls](https://projects.fivethirtyeight.com/polls/data/president_polls.csv) and [favorability polls](https://projects.fivethirtyeight.com/polls/data/favorability_polls.csv), and applies a series of weightings to adjust for various factors such as poll quality, partisanship, and sample population type. The `states.py` script scrapes data from the [270 To Win](https://www.270towin.com/) website to obtain information about the electoral votes and political leaning of each state to calculate the state-specific electoral significance.
 
+## File Structure
+[drwxr-xr-x  58k]  .
+[-rw-r--r--  147]  ├── ./Election-Polling.code-workspace
+[-rw-r--r--  16k]  ├── ./analysis.py
+[-rw-r--r--    0]  ├── ./combined.py
+[-rw-r--r-- 4.5k]  ├── ./liked.py
+[-rw-r--r-- 7.0k]  ├── ./polls.py
+[-rw-r--r--  26k]  ├── ./readme.md
+[-rw-r--r--   56]  ├── ./requirements.txt
+[-rwxr-xr-x 1.0k]  ├── ./start
+[-rw-r--r-- 3.6k]  └── ./states.py
+
 ## Data Acquisition
 
 Presidential Polling Data: Sourced from [FiveThirtyEight](https://projects.fivethirtyeight.com/), this dataset is accessed via the Python `Requests` library, ensuring real-time relevance by incorporating the latest available data into a `Pandas` DataFrame for subsequent analysis.
