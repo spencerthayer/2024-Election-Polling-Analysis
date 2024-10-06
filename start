@@ -1,36 +1,21 @@
 #!/bin/bash
 
+set -e  # Exit immediately if a command exits with a non-zero status.
+
 # Define the absolute path to your project directory
 PROJECT_DIR="/Users/spencerthayer/Documents/Work/Election-Polling"
 VENV_DIR="$PROJECT_DIR/venv"
 REQUIREMENTS_FILE="$PROJECT_DIR/requirements.txt"
 PYTHON_SCRIPT="$PROJECT_DIR/analysis.py"
 
-# Navigate to the project directory
-cd $PROJECT_DIR
-
-# Check if the virtual environment directory exists
-if [ ! -d "$VENV_DIR" ]; then
-    echo "Virtual environment not found. Creating one..."
-    python3 -m venv $VENV_DIR
-    
-    echo "Activating virtual environment..."
-    source $VENV_DIR/bin/activate
-    
-    if [ -f "$REQUIREMENTS_FILE" ]; then
-        echo "Installing requirements..."
-        pip install -r $REQUIREMENTS_FILE
-    else
-        echo "Requirements file not found. Skipping installation."
-    fi
-else
-    echo "Virtual environment found. Activating..."
-    source $VENV_DIR/bin/activate
-fi
+echo "Activating virtual environment..."
+source $VENV_DIR/bin/activate
 
 # Run the Python script
 echo "Running the Python script..."
-python3 $PYTHON_SCRIPT
+python $PYTHON_SCRIPT
+
+# python /Users/spencerthayer/Documents/Work/Election-Polling/analysis.py
 
 # Deactivate the virtual environment
 deactivate

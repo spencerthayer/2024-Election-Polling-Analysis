@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 import requests
 from io import StringIO
 import numpy as np
@@ -19,6 +20,12 @@ FAVORABILITY_WEIGHT = 0.1
 DECAY_RATE = 2
 HALF_LIFE_DAYS = 28
 
+# Define a custom order for the periods
+period_order = [
+    '1 days', '3 days', '7 days', '14 days', '21 days',
+    '1 months', '3 months', '6 months', '12 months'
+]
+
 # Utility functions
 @st.cache_data
 def download_csv_data(url):
@@ -32,26 +39,38 @@ def download_csv_data(url):
         return pd.DataFrame()
 
 def preprocess_data(df, start_period=None):
+    print("Columns in the DataFrame:", df.columns)
     df['created_at'] = pd.to_datetime(df['created_at'], format='%m/%d/%y %H:%M', errors='coerce')
     df = df.dropna(subset=['created_at'])
     if start_period:
         df = df[df['created_at'] >= start_period]
     
-    df['numeric_grade'] = pd.to_numeric(df['fte_grade'].map({
+    # Check if 'fte_grade' column exists, if not, create a default grade
+    if 'fte_grade' not in df.columns:
+        print("Warning: 'fte_grade' column not found. Using default grade.")
+        df['fte_grade'] = 'C'  # Or any other default grade you prefer
+
+    grade_map = {
         'A+': 1.0, 'A': 0.9, 'A-': 0.8, 'A/B': 0.75, 'B+': 0.7, 'B': 0.6, 'B-': 0.5,
         'B/C': 0.45, 'C+': 0.4, 'C': 0.3, 'C-': 0.2, 'C/D': 0.15, 'D+': 0.1, 'D': 0.05, 'D-': 0.025
-    }), errors='coerce').fillna(0)
+    }
+    df['numeric_grade'] = df['fte_grade'].map(grade_map).fillna(0.3)  # Default to 0.3 if grade not found
+
+    # Handle other potential missing columns
+    for col in ['transparency_score', 'sample_size', 'population', 'partisan']:
+        if col not in df.columns:
+            print(f"Warning: '{col}' column not found. Using default values.")
+            df[col] = None  # or any other appropriate default value
 
     df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
-    df['normalized_transparency_score'] = df['transparency_score'] / df['transparency_score'].max()
+    df['normalized_transparency_score'] = df['transparency_score'] / df['transparency_score'].max() if df['transparency_score'].max() > 0 else 0
 
     df['sample_size'] = pd.to_numeric(df['sample_size'], errors='coerce').fillna(0)
-    df['sample_size_weight'] = (df['sample_size'] - df['sample_size'].min()) / (df['sample_size'].max() - df['sample_size'].min())
+    df['sample_size_weight'] = (df['sample_size'] - df['sample_size'].min()) / (df['sample_size'].max() - df['sample_size'].min()) if df['sample_size'].max() > df['sample_size'].min() else 0
 
     df['population'] = df['population'].str.lower()
-    df['population_weight'] = df['population'].map({
-        'lv': 1.0, 'rv': 0.67, 'v': 0.5, 'a': 0.33, 'all': 0.33
-    }).fillna(1)
+    population_weights = {'lv': 1.0, 'rv': 0.67, 'v': 0.5, 'a': 0.33, 'all': 0.33}
+    df['population_weight'] = df['population'].map(population_weights).fillna(1)
 
     df['partisan_weight'] = (~df['partisan'].isna() & (df['partisan'] != '')).map({True: 0.1, False: 1})
 
@@ -105,15 +124,20 @@ def combine_analysis(polling_metrics, favorability_differential, favorability_we
     return combined_metrics
 
 def create_chart(df, y_columns, title):
-    base = alt.Chart(df).encode(x='period:O')
+    # Sort the dataframe by the custom order
+    df['period'] = pd.Categorical(df['period'], categories=period_order, ordered=True)
+    df = df.sort_values('period')
+
+    base = alt.Chart(df).encode(
+        x=alt.X('period:O', sort=period_order),
+        y=alt.Y('value:Q', scale=alt.Scale(domain=[30, 70]))
+    )
     
     lines = base.mark_line().encode(
-        y=alt.Y('value:Q', scale=alt.Scale(domain=[30, 70])),
         color=alt.Color('candidate:N', scale=alt.Scale(domain=CANDIDATE_NAMES, range=['blue', 'red']))
     ).transform_fold(y_columns, as_=['candidate', 'value'])
     
     points = base.mark_point().encode(
-        y=alt.Y('value:Q', scale=alt.Scale(domain=[30, 70])),
         color=alt.Color('candidate:N', scale=alt.Scale(domain=CANDIDATE_NAMES, range=['blue', 'red']))
     ).transform_fold(y_columns, as_=['candidate', 'value'])
     
@@ -135,6 +159,18 @@ def create_chart(df, y_columns, title):
     
     return chart.properties(width=600, height=400, title=title).interactive()
 
+def impute_data(X):
+    imputer = SimpleImputer(strategy='median')
+    for col in range(X.shape[1]):
+        if np.any(~np.isnan(X[:, col])):
+            X[:, col] = imputer.fit_transform(X[:, col].reshape(-1, 1)).ravel()
+    return X
+
+def _get_unsampled_indices(tree, n_samples):
+    unsampled_mask = np.ones(n_samples, dtype=bool)
+    unsampled_mask[tree.tree_.feature[tree.tree_.feature >= 0]] = False
+    return np.arange(n_samples)[unsampled_mask]
+
 # Main Streamlit app
 st.set_page_config(page_title="Election Polling Analysis", layout="wide")
 st.title("Election Polling Analysis")
@@ -148,13 +184,16 @@ favorability_df = preprocess_data(favorability_df)
 
 # Analyze data for different time periods
 periods = [
-    (12, 'months'), (6, 'months'), (3, 'months'), (1, 'months'),
-    (21, 'days'), (14, 'days'), (7, 'days'), (3, 'days'), (1, 'days')
+    (1, 'days'), (3, 'days'), (7, 'days'), (14, 'days'), (21, 'days'),
+    (1, 'months'), (3, 'months'), (6, 'months'), (12, 'months')
 ]
 
 results = []
 for period_value, period_type in periods:
-    start_period = datetime.now() - timedelta(**{period_type: period_value})
+    if period_type == 'months':
+        start_period = datetime.now() - relativedelta(months=period_value)
+    else:  # 'days'
+        start_period = datetime.now() - timedelta(days=period_value)
     
     period_polling_df = polling_df[polling_df['created_at'] >= start_period]
     period_favorability_df = favorability_df[favorability_df['created_at'] >= start_period]
@@ -165,10 +204,10 @@ for period_value, period_type in periods:
     
     results.append({
         'period': f"{period_value} {period_type}",
-        'harris_poll': combined_results['Kamala Harris'][0],
-        'harris_moe': combined_results['Kamala Harris'][1],
-        'trump_poll': combined_results['Donald Trump'][0],
-        'trump_moe': combined_results['Donald Trump'][1],
+        'harris_poll': combined_results['Kamala Harris'][0] if 'Kamala Harris' in combined_results else 0,
+        'harris_moe': combined_results['Kamala Harris'][1] if 'Kamala Harris' in combined_results else 0,
+        'trump_poll': combined_results['Donald Trump'][0] if 'Donald Trump' in combined_results else 0,
+        'trump_moe': combined_results['Donald Trump'][1] if 'Donald Trump' in combined_results else 0,
         'harris_fav': favorability_differential.get('Kamala Harris', 0),
         'trump_fav': favorability_differential.get('Donald Trump', 0),
     })
@@ -194,18 +233,6 @@ st.dataframe(results_df)
 
 # Add OOB Random Forest analysis
 st.header("Out-of-Bag (OOB) Random Forest Analysis")
-
-def impute_data(X):
-    imputer = SimpleImputer(strategy='median')
-    for col in range(X.shape[1]):
-        if np.any(~np.isnan(X[:, col])):
-            X[:, col] = imputer.fit_transform(X[:, col].reshape(-1, 1)).ravel()
-    return X
-
-def _get_unsampled_indices(tree, n_samples):
-    unsampled_mask = np.ones(n_samples, dtype=bool)
-    unsampled_mask[tree.tree_.feature[tree.tree_.feature >= 0]] = False
-    return np.arange(n_samples)[unsampled_mask]
 
 features_columns = ['numeric_grade', 'normalized_transparency_score', 'sample_size_weight', 'population_weight', 'partisan_weight', 'time_decay_weight']
 X = polling_df[features_columns].values

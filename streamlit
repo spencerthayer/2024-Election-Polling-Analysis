@@ -16,20 +16,20 @@ start_streamlit() {
     if [ ! -d "$VENV_DIR" ]; then
         echo "Virtual environment not found. Creating one..."
         python3 -m venv $VENV_DIR
-        
-        echo "Activating virtual environment..."
-        source $VENV_DIR/bin/activate
-        
-        if [ -f "$REQUIREMENTS_FILE" ]; then
-            echo "Installing requirements..."
-            pip install -r $REQUIREMENTS_FILE
-        else
-            echo "Requirements file not found. Skipping installation."
-        fi
-    else
-        echo "Virtual environment found. Activating..."
-        source $VENV_DIR/bin/activate
     fi
+    
+    echo "Activating virtual environment..."
+    source $VENV_DIR/bin/activate
+    
+    if [ -f "$REQUIREMENTS_FILE" ]; then
+        echo "Installing/Updating requirements..."
+        pip install -r $REQUIREMENTS_FILE
+    else
+        echo "Requirements file not found. Skipping installation."
+    fi
+
+    # Ensure Streamlit is installed
+    pip install streamlit
 
     # Check if Streamlit is already running
     if [ -f "$PID_FILE" ]; then
@@ -39,7 +39,7 @@ start_streamlit() {
 
     # Run the Streamlit application
     echo "Starting Streamlit application..."
-    streamlit run $STREAMLIT_SCRIPT &
+    $VENV_DIR/bin/python -m streamlit run $STREAMLIT_SCRIPT &
     echo $! > $PID_FILE
     echo "Streamlit application started. PID: $(cat $PID_FILE)"
 }

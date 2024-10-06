@@ -1,0 +1,87 @@
+#!/bin/bash
+
+set -e  # Exit immediately if a command exits with a non-zero status.
+
+# Define the absolute path to your project directory
+PROJECT_DIR="/Users/spencerthayer/Documents/Work/Election-Polling"
+VENV_DIR="$PROJECT_DIR/venv"
+REQUIREMENTS_FILE="$PROJECT_DIR/requirements.txt"
+PYTHON_SCRIPT="$PROJECT_DIR/analysis.py"
+
+# Function to check and install pip
+check_and_install_pip() {
+    if ! python -m pip --version > /dev/null 2>&1; then
+        echo "pip not found. Attempting to install..."
+        python -m ensurepip --default-pip
+        if ! python -m pip --version > /dev/null 2>&1; then
+            echo "ensurepip failed. Trying manual installation..."
+            curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+            python get-pip.py
+            rm get-pip.py
+        fi
+    fi
+    
+    if python -m pip --version > /dev/null 2>&1; then
+        echo "pip is installed and functioning."
+        python -m pip --version
+    else
+        echo "Failed to install pip. Please install pip manually and try again."
+        exit 1
+    fi
+}
+
+# Navigate to the project directory
+cd $PROJECT_DIR
+echo "Current directory: $(pwd)"
+
+# Check if the virtual environment directory exists
+if [ ! -d "$VENV_DIR" ]; then
+    echo "Virtual environment not found. Creating one..."
+    python3 -m venv $VENV_DIR
+fi
+
+echo "Activating virtual environment..."
+source $VENV_DIR/bin/activate
+
+# Debug information
+echo "Python version:"
+python --version
+echo "Python path:"
+which python
+
+# Check and install pip if necessary
+check_and_install_pip
+
+# Attempt to upgrade pip
+echo "Upgrading pip..."
+python -m pip install --upgrade pip
+
+# Check if requirements file exists
+if [ -f "$REQUIREMENTS_FILE" ]; then
+    echo "Requirements file found. Contents:"
+    cat "$REQUIREMENTS_FILE"
+    
+    echo "Installing requirements..."
+    python -m pip install -r $REQUIREMENTS_FILE -v  # Added -v for verbose output
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to install requirements."
+        exit 1
+    fi
+else
+    echo "Error: Requirements file not found at $REQUIREMENTS_FILE"
+    exit 1
+fi
+
+# Verify installed packages
+echo "Installed packages:"
+python -m pip list
+
+# Run the Python script
+echo "Running the Python script..."
+python $PYTHON_SCRIPT
+
+# python /Users/spencerthayer/Documents/Work/Election-Polling/analysis.py
+
+# Deactivate the virtual environment
+deactivate
+echo "Virtual environment deactivated."
