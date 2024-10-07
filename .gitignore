@@ -3,3 +3,4 @@
 /venv
 /resources
 *.csv
+.streamlit.pid
