@@ -28,15 +28,27 @@ period_order = [
     '1 months', '3 months', '6 months', '12 months'
 ]
 
+# Caching the data download to avoid re-fetching on each rerun
+@st.cache_data
+def load_data():
+    polling_df = download_csv_data(POLLING_URL)
+    favorability_df = download_csv_data(FAVORABILITY_URL)
+    return polling_df, favorability_df
+
 def create_line_chart(df, y_columns, title):
-    df_melted = df.melt(id_vars=['period'], value_vars=y_columns, var_name='candidate', value_name='value')
+    df_melted = df.melt(
+        id_vars=['period'],
+        value_vars=y_columns,
+        var_name='candidate',
+        value_name='value'
+    )
 
     y_min = df_melted['value'].min() - 0.5
     y_max = df_melted['value'].max() + 0.5
 
     color_scale = alt.Scale(
         domain=y_columns,
-        range=[HARRIS_COLOR, TRUMP_COLOR]
+        range=[HARRIS_COLOR, TRUMP_COLOR, '#6495ED', '#FFA07A']
     )
 
     chart = alt.Chart(df_melted).mark_line().encode(
@@ -44,11 +56,37 @@ def create_line_chart(df, y_columns, title):
         y=alt.Y('value:Q', scale=alt.Scale(domain=[y_min, y_max]), title='Percentage'),
         color=alt.Color('candidate:N', scale=color_scale)
     ).properties(
-        width=600,
+        width=800,
         height=400,
         title=title
     )
     
+    st.altair_chart(chart, use_container_width=True)
+
+def create_stacked_bar_chart(df):
+    # Melt the dataframe to create a long format suitable for stacking
+    df_melted = df.melt(
+        id_vars=['period'],
+        value_vars=['harris', 'trump', 'harris_fav', 'trump_fav'],
+        var_name='metric',
+        value_name='value'
+    )
+
+    # Create the stacked bar chart
+    chart = alt.Chart(df_melted).mark_bar().encode(
+        x=alt.X('period:N', sort=period_order, title='Period'),
+        y=alt.Y('value:Q', title='Percentage'),
+        color=alt.Color('metric:N', scale=alt.Scale(
+            domain=['harris', 'trump', 'harris_fav', 'trump_fav'],
+            range=[HARRIS_COLOR, TRUMP_COLOR, '#6495ED', '#FFA07A']
+        )),
+        tooltip=['period', 'metric', 'value']
+    ).properties(
+        width=800,
+        height=400,
+        title="Stacked Analysis: Polling and Favorability"
+    )
+
     st.altair_chart(chart, use_container_width=True)
 
 def create_differential_bar_chart(df):
@@ -75,16 +113,16 @@ def create_differential_bar_chart(df):
         ]
     ).properties(
         title="Differential Between Harris and Trump Over Time",
-        width=600,
+        width=800,
         height=400
     )
 
     st.altair_chart(bar_chart, use_container_width=True)
 
+@st.cache_data
 def run_analysis():
     try:
-        polling_df = download_csv_data(POLLING_URL)
-        favorability_df = download_csv_data(FAVORABILITY_URL)
+        polling_df, favorability_df = load_data()
 
         polling_df = preprocess_data(polling_df)
         favorability_df = preprocess_data(favorability_df)
@@ -119,11 +157,11 @@ def run_analysis():
             results.append({
                 'period': f"{period_value} {period_type}",
                 'harris': combined_results['Kamala Harris'][0],
-                'harris_moe': combined_results['Kamala Harris'][1],
                 'trump': combined_results['Donald Trump'][0],
-                'trump_moe': combined_results['Donald Trump'][1],
                 'harris_fav': favorability_differential.get('Kamala Harris', 0),
                 'trump_fav': favorability_differential.get('Donald Trump', 0),
+                'harris_moe': combined_results['Kamala Harris'][1],
+                'trump_moe': combined_results['Donald Trump'][1]
             })
 
         results_df = pd.DataFrame(results)
@@ -161,6 +199,9 @@ if not results_df.empty:
     st.header("Combined Analysis Over Time")
     create_line_chart(results_df, ['harris', 'trump'], "Combined Analysis Over Time")
 
+    st.header("Stacked Analysis")
+    create_stacked_bar_chart(results_df)
+
     st.header("Differential Analysis")
     create_differential_bar_chart(results_df)
 
@@ -173,10 +214,6 @@ if not results_df.empty:
 
 else:
     st.write("No data available for the selected periods.")
-
-# Display raw data
-st.header("Raw Data")
-st.dataframe(results_df)
 
 # Footer
 st.markdown("---")
