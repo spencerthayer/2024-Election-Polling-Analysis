@@ -1,11 +1,11 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import altair as alt
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import requests
 from io import StringIO
-import numpy as np
 from scipy.stats import norm
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
@@ -39,6 +39,9 @@ def download_csv_data(url):
         return pd.DataFrame()
 
 def preprocess_data(df, start_period=None):
+    st.write("Preprocessing data...")
+    st.write("Columns in the DataFrame:", df.columns)
+    
     df['created_at'] = pd.to_datetime(df['created_at'], format='%m/%d/%y %H:%M', errors='coerce')
     df = df.dropna(subset=['created_at'])
     if start_period:
@@ -51,7 +54,7 @@ def preprocess_data(df, start_period=None):
 
     # Check if 'fte_grade' column exists, if not, create a default grade
     if 'fte_grade' not in df.columns:
-        print("Warning: 'fte_grade' column not found. Using default grade.")
+        st.warning("'fte_grade' column not found. Using default grade.")
         df['fte_grade'] = 'C'  # Or any other default grade you prefer
 
     df['numeric_grade'] = df['fte_grade'].map(grade_map).fillna(0.3)
@@ -59,7 +62,7 @@ def preprocess_data(df, start_period=None):
     # Handle other potential missing columns
     for col in ['transparency_score', 'sample_size', 'population', 'partisan']:
         if col not in df.columns:
-            print(f"Warning: '{col}' column not found. Using default values.")
+            st.warning(f"'{col}' column not found. Using default values.")
             df[col] = None  # or any other appropriate default value
 
     df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
@@ -77,8 +80,9 @@ def preprocess_data(df, start_period=None):
 
     df['time_decay_weight'] = np.exp(-np.log(DECAY_RATE) * (datetime.now() - df['created_at']).dt.days / HALF_LIFE_DAYS)
 
+    st.write("Preprocessed data shape:", df.shape)
     return df
-    
+
 def calculate_polling_metrics(df, candidate_names):
     metrics = {}
     for candidate in candidate_names:
@@ -124,42 +128,6 @@ def combine_analysis(polling_metrics, favorability_differential, favorability_we
         combined_metrics[candidate] = (combined_result, moe)
     return combined_metrics
 
-def create_chart(df, y_columns, title):
-    # Ensure the period column is properly formatted
-    df['period'] = pd.Categorical(df['period'], categories=period_order, ordered=True)
-    df = df.sort_values('period')
-
-    base = alt.Chart(df).encode(
-        x=alt.X('period:O', sort=period_order),
-        y=alt.Y('value:Q', scale=alt.Scale(domain=[30, 70]))
-    )
-    
-    lines = base.mark_line().encode(
-        color=alt.Color('candidate:N', scale=alt.Scale(domain=CANDIDATE_NAMES, range=['blue', 'red']))
-    ).transform_fold(y_columns, as_=['candidate', 'value'])
-    
-    points = base.mark_point().encode(
-        color=alt.Color('candidate:N', scale=alt.Scale(domain=CANDIDATE_NAMES, range=['blue', 'red']))
-    ).transform_fold(y_columns, as_=['candidate', 'value'])
-    
-    if 'moe' in df.columns:
-        error_bars = base.mark_errorbar(extent='ci').encode(
-            y='low:Q',
-            y2='high:Q',
-            color=alt.Color('candidate:N', scale=alt.Scale(domain=CANDIDATE_NAMES, range=['blue', 'red']))
-        ).transform_fold(
-            y_columns,
-            as_=['candidate', 'value']
-        ).transform_calculate(
-            low='datum.value - datum.moe',
-            high='datum.value + datum.moe'
-        )
-        chart = (lines + points + error_bars)
-    else:
-        chart = (lines + points)
-    
-    return chart.properties(width=600, height=400, title=title).interactive()
-
 def impute_data(X):
     imputer = SimpleImputer(strategy='median')
     for col in range(X.shape[1]):
@@ -172,13 +140,23 @@ def _get_unsampled_indices(tree, n_samples):
     unsampled_mask[tree.tree_.feature[tree.tree_.feature >= 0]] = False
     return np.arange(n_samples)[unsampled_mask]
 
+# Function to create a line chart
+def create_line_chart(df, y_columns, title):
+    st.line_chart(df.set_index('period')[y_columns], use_container_width=True)
+    st.write(title)
+
 # Main Streamlit app
 st.set_page_config(page_title="Election Polling Analysis", layout="wide")
 st.title("Election Polling Analysis")
 
 # Download and preprocess data
+st.write("Downloading polling data...")
 polling_df = download_csv_data(POLLING_URL)
+st.write("Polling data shape:", polling_df.shape)
+
+st.write("Downloading favorability data...")
 favorability_df = download_csv_data(FAVORABILITY_URL)
+st.write("Favorability data shape:", favorability_df.shape)
 
 polling_df = preprocess_data(polling_df)
 favorability_df = preprocess_data(favorability_df)
@@ -191,6 +169,7 @@ periods = [
 
 results = []
 for period_value, period_type in periods:
+    st.write(f"Processing period: {period_value} {period_type}")
     if period_type == 'months':
         start_period = datetime.now() - relativedelta(months=period_value)
     else:  # 'days'
@@ -198,6 +177,9 @@ for period_value, period_type in periods:
     
     period_polling_df = polling_df[polling_df['created_at'] >= start_period]
     period_favorability_df = favorability_df[favorability_df['created_at'] >= start_period]
+    
+    st.write(f"Polling data for period: {period_polling_df.shape}")
+    st.write(f"Favorability data for period: {period_favorability_df.shape}")
     
     polling_metrics = calculate_polling_metrics(period_polling_df, CANDIDATE_NAMES)
     favorability_differential = calculate_favorability_differential(period_favorability_df, CANDIDATE_NAMES)
@@ -214,19 +196,28 @@ for period_value, period_type in periods:
     })
 
 results_df = pd.DataFrame(results)
+st.write("Results DataFrame:")
+st.write(results_df)
+st.write(results_df.dtypes)
 
 # Display charts
 st.header("Polling Results Over Time")
-polling_chart = create_chart(results_df, ['harris_poll', 'trump_poll'], 'Polling Results Over Time')
-st.altair_chart(polling_chart, use_container_width=True)
+create_line_chart(results_df, ['harris_poll', 'trump_poll'], "Polling Results Over Time")
 
 st.header("Favorability Over Time")
-favorability_chart = create_chart(results_df, ['harris_fav', 'trump_fav'], 'Favorability Over Time')
-st.altair_chart(favorability_chart, use_container_width=True)
+create_line_chart(results_df, ['harris_fav', 'trump_fav'], "Favorability Over Time")
 
 st.header("Combined Analysis Over Time")
-combined_chart = create_chart(results_df, ['harris_poll', 'trump_poll'], 'Combined Analysis Over Time')
-st.altair_chart(combined_chart, use_container_width=True)
+create_line_chart(results_df, ['harris_poll', 'trump_poll'], "Combined Analysis Over Time")
+
+# Display polling results with error bars
+st.header("Polling Results with Error Bars")
+st.error_bar_chart(
+    results_df.set_index('period')[['harris_poll', 'trump_poll']],
+    error_data=results_df.set_index('period')[['harris_moe', 'trump_moe']],
+    use_container_width=True
+)
+st.write("Polling Results with Error Bars")
 
 # Display raw data
 st.header("Raw Data")
@@ -268,6 +259,11 @@ feature_importance_df = pd.DataFrame({'feature': features_columns, 'importance':
 feature_importance_df = feature_importance_df.sort_values('importance', ascending=False)
 
 st.subheader("Feature Importance")
+
+# Streamlit native bar chart
+st.bar_chart(feature_importance_df.set_index('feature')['importance'])
+
+# Altair chart for more detailed visualization
 feature_chart = alt.Chart(feature_importance_df).mark_bar().encode(
     x='importance:Q',
     y=alt.Y('feature:N', sort='-x'),
@@ -275,3 +271,13 @@ feature_chart = alt.Chart(feature_importance_df).mark_bar().encode(
 ).properties(width=600, height=300, title="Feature Importance in Random Forest Model")
 
 st.altair_chart(feature_chart, use_container_width=True)
+
+# Add explanations for feature importance
+st.write("Feature Importance Explanation:")
+st.write("- The chart above shows the relative importance of each feature in the Random Forest model.")
+st.write("- Features with higher importance have a greater impact on the model's predictions.")
+st.write("- This can help identify which factors are most influential in the polling and favorability analysis.")
+
+# You can add more detailed explanations for each feature if desired
+for feature, importance in feature_importance_df.itertuples(index=False):
+    st.write(f"- {feature}: {importance:.4f}")
