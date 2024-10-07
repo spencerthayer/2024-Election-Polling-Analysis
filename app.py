@@ -39,22 +39,22 @@ def download_csv_data(url):
         return pd.DataFrame()
 
 def preprocess_data(df, start_period=None):
-    print("Columns in the DataFrame:", df.columns)
     df['created_at'] = pd.to_datetime(df['created_at'], format='%m/%d/%y %H:%M', errors='coerce')
     df = df.dropna(subset=['created_at'])
     if start_period:
         df = df[df['created_at'] >= start_period]
     
+    grade_map = {
+        'A+': 1.0, 'A': 0.9, 'A-': 0.8, 'A/B': 0.75, 'B+': 0.7, 'B': 0.6, 'B-': 0.5,
+        'B/C': 0.45, 'C+': 0.4, 'C': 0.3, 'C-': 0.2, 'C/D': 0.15, 'D+': 0.1, 'D': 0.05, 'D-': 0.025
+    }
+
     # Check if 'fte_grade' column exists, if not, create a default grade
     if 'fte_grade' not in df.columns:
         print("Warning: 'fte_grade' column not found. Using default grade.")
         df['fte_grade'] = 'C'  # Or any other default grade you prefer
 
-    grade_map = {
-        'A+': 1.0, 'A': 0.9, 'A-': 0.8, 'A/B': 0.75, 'B+': 0.7, 'B': 0.6, 'B-': 0.5,
-        'B/C': 0.45, 'C+': 0.4, 'C': 0.3, 'C-': 0.2, 'C/D': 0.15, 'D+': 0.1, 'D': 0.05, 'D-': 0.025
-    }
-    df['numeric_grade'] = df['fte_grade'].map(grade_map).fillna(0.3)  # Default to 0.3 if grade not found
+    df['numeric_grade'] = df['fte_grade'].map(grade_map).fillna(0.3)
 
     # Handle other potential missing columns
     for col in ['transparency_score', 'sample_size', 'population', 'partisan']:
@@ -63,21 +63,22 @@ def preprocess_data(df, start_period=None):
             df[col] = None  # or any other appropriate default value
 
     df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
-    df['normalized_transparency_score'] = df['transparency_score'] / df['transparency_score'].max() if df['transparency_score'].max() > 0 else 0
+    max_transparency = df['transparency_score'].max()
+    df['normalized_transparency_score'] = df['transparency_score'] / max_transparency if max_transparency > 0 else 0
 
     df['sample_size'] = pd.to_numeric(df['sample_size'], errors='coerce').fillna(0)
-    df['sample_size_weight'] = (df['sample_size'] - df['sample_size'].min()) / (df['sample_size'].max() - df['sample_size'].min()) if df['sample_size'].max() > df['sample_size'].min() else 0
+    min_sample, max_sample = df['sample_size'].min(), df['sample_size'].max()
+    df['sample_size_weight'] = (df['sample_size'] - min_sample) / (max_sample - min_sample) if max_sample > min_sample else 0
 
-    df['population'] = df['population'].str.lower()
     population_weights = {'lv': 1.0, 'rv': 0.67, 'v': 0.5, 'a': 0.33, 'all': 0.33}
-    df['population_weight'] = df['population'].map(population_weights).fillna(1)
+    df['population_weight'] = df['population'].str.lower().map(population_weights).fillna(1)
 
     df['partisan_weight'] = (~df['partisan'].isna() & (df['partisan'] != '')).map({True: 0.1, False: 1})
 
     df['time_decay_weight'] = np.exp(-np.log(DECAY_RATE) * (datetime.now() - df['created_at']).dt.days / HALF_LIFE_DAYS)
 
     return df
-
+    
 def calculate_polling_metrics(df, candidate_names):
     metrics = {}
     for candidate in candidate_names:
@@ -124,7 +125,7 @@ def combine_analysis(polling_metrics, favorability_differential, favorability_we
     return combined_metrics
 
 def create_chart(df, y_columns, title):
-    # Sort the dataframe by the custom order
+    # Ensure the period column is properly formatted
     df['period'] = pd.Categorical(df['period'], categories=period_order, ordered=True)
     df = df.sort_values('period')
 
