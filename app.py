@@ -29,20 +29,19 @@ period_order = [
 ]
 
 def create_line_chart(df, y_columns, title):
-    y_min = min(df[y_columns].min().min() - 0.5, 42)  # Ensure lower bound is at least 42
-    y_max = max(df[y_columns].max().max() + 0.5, 49)  # Ensure upper bound is at least 49
+    df_melted = df.melt(id_vars=['period'], value_vars=y_columns, var_name='candidate', value_name='value')
+
+    y_min = df_melted['value'].min() - 0.5
+    y_max = df_melted['value'].max() + 0.5
 
     color_scale = alt.Scale(
-        domain=['harris', 'trump'],
+        domain=y_columns,
         range=[HARRIS_COLOR, TRUMP_COLOR]
     )
 
-    chart = alt.Chart(df).transform_fold(
-        y_columns,
-        as_=['candidate', 'value']
-    ).mark_line().encode(
+    chart = alt.Chart(df_melted).mark_line().encode(
         x=alt.X('period:N', sort=period_order, title='Period'),
-        y=alt.Y('value:Q', scale=alt.Scale(domain=[y_min, y_max]), title='Polling Percentage'),
+        y=alt.Y('value:Q', scale=alt.Scale(domain=[y_min, y_max]), title='Percentage'),
         color=alt.Color('candidate:N', scale=color_scale)
     ).properties(
         width=600,
@@ -127,7 +126,11 @@ def run_analysis():
                 'trump_fav': favorability_differential.get('Donald Trump', 0),
             })
 
-        return pd.DataFrame(results)
+        results_df = pd.DataFrame(results)
+        results_df['period'] = pd.Categorical(results_df['period'], categories=period_order, ordered=True)
+        results_df = results_df.sort_values('period')
+
+        return results_df
 
     except Exception as e:
         st.error(f"An error occurred during analysis: {str(e)}")
@@ -141,9 +144,6 @@ st.title("Election Polling Analysis")
 results_df = run_analysis()
 
 if not results_df.empty:
-    results_df = results_df.sort_values('period')
-    results_df['period'] = pd.Categorical(results_df['period'], categories=period_order, ordered=True)
-
     st.write("Results DataFrame:")
     st.write(results_df)
     st.write("Data types of results:", results_df.dtypes)
