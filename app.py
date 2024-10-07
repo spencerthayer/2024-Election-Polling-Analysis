@@ -195,8 +195,25 @@ def _get_unsampled_indices(tree, n_samples):
 
 # Function to create a line chart
 def create_line_chart(df, y_columns, title):
-    st.line_chart(df.set_index('period')[y_columns], use_container_width=True)
-    st.write(title)
+    # Determine min and max values for Y-axis range
+    y_min = df[y_columns].min().min() - 0.5
+    y_max = df[y_columns].max().max() + 0.5
+
+    # Create a line chart using Altair with normalized Y-axis limits
+    chart = alt.Chart(df).transform_fold(
+        y_columns,
+        as_=['candidate', 'value']
+    ).mark_line().encode(
+        x=alt.X('period:N', sort=period_order, title='Period'),
+        y=alt.Y('value:Q', scale=alt.Scale(domain=[y_min, y_max]), title='Polling Percentage'),
+        color='candidate:N'
+    ).properties(
+        width=600,
+        height=400,
+        title=title
+    )
+    
+    st.altair_chart(chart, use_container_width=True)
 
 # Main Streamlit app
 st.set_page_config(page_title="Election Polling Analysis", layout="wide")
@@ -382,4 +399,4 @@ st.download_button(
 
 # Footer
 st.markdown("---")
-st.write("Developed by [Your Name/Organization]. Last updated: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+st.write("Developed by Spencer Thayer. Last updated: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
