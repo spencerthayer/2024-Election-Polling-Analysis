@@ -140,36 +140,6 @@ def calculate_polling_metrics(df, candidate_names):
 
     return {candidate: (weighted_averages.get(candidate, 0), moes.get(candidate, 0)) for candidate in candidate_names}
 
-    df = df.copy()
-    df['pct'] = df['pct'].apply(lambda x: x if x > 1 else x * 100)
-
-    df['is_partisan'] = df['partisan'].notna() & df['partisan'].ne('')
-    df['partisan_weight'] = df['is_partisan'].map(partisan_weight)
-
-    list_weights = np.array([
-        df['time_decay_weight'],
-        df['sample_size_weight'],
-        df['normalized_numeric_grade'],
-        df['normalized_transparency_score'],
-        df['population_weight'],
-        df['partisan_weight'],
-        df['state_rank'],
-    ])
-    df['combined_weight'] = np.prod(list_weights, axis=0)
-
-    weighted_sums = df.groupby('candidate_name').apply(lambda x: (x['combined_weight'] * x['pct']).sum()).fillna(0)
-    total_weights = df.groupby('candidate_name')['combined_weight'].sum().fillna(0)
-    weighted_averages = (weighted_sums / total_weights).fillna(0)
-
-    moes = {}
-    for candidate in candidate_names:
-        candidate_df = df[df['candidate_name'] == candidate]
-        if not candidate_df.empty:
-            moe = calculate_moe(candidate_df)
-            moes[candidate] = moe
-
-    return {candidate: (weighted_averages.get(candidate, 0), moes.get(candidate, 0)) for candidate in candidate_names}
-
 def calculate_favorability_differential(df, candidate_names):
     df = df.copy()
     df['favorable'] = df['favorable'].apply(lambda x: x if x > 1 else x * 100)
@@ -188,8 +158,8 @@ def calculate_favorability_differential(df, candidate_names):
     total_weights = df.groupby('politician')['combined_weight'].sum().fillna(0)
     
     # Ensure we're working with Series, not DataFrames
-    weighted_sums = pd.Series(weighted_sums)
-    total_weights = pd.Series(total_weights)
+    weighted_sums = weighted_sums.squeeze()
+    total_weights = total_weights.squeeze()
     
     weighted_averages = (weighted_sums / total_weights).fillna(0)
 
@@ -251,7 +221,6 @@ periods = [
 ]
 
 results = []
-# In the main part of your script where you process different time periods
 
 for period_value, period_type in periods:
     st.write(f"Processing period: {period_value} {period_type}")
@@ -284,33 +253,7 @@ for period_value, period_type in periods:
         st.error(f"Error processing data for period {period_value} {period_type}: {str(e)}")
         st.write("Skipping this period due to error.")
         continue
-#####
-    st.write(f"Processing period: {period_value} {period_type}")
-    if period_type == 'months':
-        start_period = datetime.now() - relativedelta(months=period_value)
-    else:  # 'days'
-        start_period = datetime.now() - timedelta(days=period_value)
-    
-    period_polling_df = polling_df[polling_df['created_at'] >= start_period]
-    period_favorability_df = favorability_df[favorability_df['created_at'] >= start_period]
-    
-    st.write(f"Polling data for period: {period_polling_df.shape}")
-    st.write(f"Favorability data for period: {period_favorability_df.shape}")
-    
-    polling_metrics = calculate_polling_metrics(period_polling_df, CANDIDATE_NAMES)
-    favorability_differential = calculate_favorability_differential(period_favorability_df, CANDIDATE_NAMES)
-    combined_results = combine_analysis(polling_metrics, favorability_differential, FAVORABILITY_WEIGHT)
-    
-    results.append({
-        'period': f"{period_value} {period_type}",
-        'harris_poll': combined_results['Kamala Harris'][0] if 'Kamala Harris' in combined_results else 0,
-        'harris_moe': combined_results['Kamala Harris'][1] if 'Kamala Harris' in combined_results else 0,
-        'trump_poll': combined_results['Donald Trump'][0] if 'Donald Trump' in combined_results else 0,
-        'trump_moe': combined_results['Donald Trump'][1] if 'Donald Trump' in combined_results else 0,
-        'harris_fav': favorability_differential.get('Kamala Harris', 0),
-        'trump_fav': favorability_differential.get('Donald Trump', 0),
-    })
-# 
+
 results_df = pd.DataFrame(results)
 st.write("Results DataFrame:")
 st.write(results_df)
@@ -326,15 +269,6 @@ create_line_chart(results_df, ['harris_fav', 'trump_fav'], "Favorability Over Ti
 st.header("Combined Analysis Over Time")
 create_line_chart(results_df, ['harris_poll', 'trump_poll'], "Combined Analysis Over Time")
 
-# Display polling results with error bars
-st.header("Polling Results with Error Bars")
-st.error_bar_chart(
-    results_df.set_index('period')[['harris_poll', 'trump_poll']],
-    error_data=results_df.set_index('period')[['harris_moe', 'trump_moe']],
-    use_container_width=True
-)
-st.write("Polling Results with Error Bars")
-
 # Display raw data
 st.header("Raw Data")
 st.dataframe(results_df)
@@ -347,7 +281,7 @@ X = polling_df[features_columns].values
 y = polling_df['pct'].values
 
 pipeline = Pipeline(steps=[
-    ('imputer', FunctionTransformer(impute_data)), 
+    ('imputer', FunctionTransformer(impute_data)),
     ('model', RandomForestRegressor(n_estimators=100, oob_score=True, random_state=42, bootstrap=True))
 ])
 
@@ -401,7 +335,7 @@ for feature, importance in feature_importance_df.itertuples(index=False):
 # Additional context and interpretation
 st.subheader("Interpretation of Results")
 st.write("""
-The analysis presented above combines polling data, favorability ratings, and various weighting factors to provide 
+The analysis presented above combines polling data, favorability ratings, and various weighting factors to provide
 a comprehensive view of the current state of the presidential race between Kamala Harris and Donald Trump.
 
 Key points to consider:
@@ -410,17 +344,17 @@ Key points to consider:
 3. The combined analysis integrates both polling and favorability data for a more nuanced perspective.
 4. The feature importance chart highlights which factors have the most significant impact on the model's predictions.
 
-It's important to note that this analysis is based on historical data and current trends. Political landscapes can 
-change rapidly, and unforeseen events can significantly impact public opinion. Always consider this analysis as 
+It's important to note that this analysis is based on historical data and current trends. Political landscapes can
+change rapidly, and unforeseen events can significantly impact public opinion. Always consider this analysis as
 one of many tools for understanding the political climate, rather than a definitive prediction of election outcomes.
 """)
 
 # Disclaimer
 st.sidebar.header("Disclaimer")
 st.sidebar.write("""
-This analysis is for educational and informational purposes only. It does not constitute an official election forecast 
+This analysis is for educational and informational purposes only. It does not constitute an official election forecast
 or prediction. The results presented here are based on publicly available data and should be interpreted with caution.
-Always refer to official sources and professional pollsters for the most accurate and up-to-date information on 
+Always refer to official sources and professional pollsters for the most accurate and up-to-date information on
 election-related matters.
 """)
 
