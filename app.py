@@ -242,9 +242,9 @@ for period_value, period_type in periods:
         
         results.append({
             'period': f"{period_value} {period_type}",
-            'harris_poll': combined_results['Kamala Harris'][0] if 'Kamala Harris' in combined_results else 0,
+            'harris': combined_results['Kamala Harris'][0] if 'Kamala Harris' in combined_results else 0,
             'harris_moe': combined_results['Kamala Harris'][1] if 'Kamala Harris' in combined_results else 0,
-            'trump_poll': combined_results['Donald Trump'][0] if 'Donald Trump' in combined_results else 0,
+            'trump': combined_results['Donald Trump'][0] if 'Donald Trump' in combined_results else 0,
             'trump_moe': combined_results['Donald Trump'][1] if 'Donald Trump' in combined_results else 0,
             'harris_fav': favorability_differential.get('Kamala Harris', 0),
             'trump_fav': favorability_differential.get('Donald Trump', 0),
@@ -255,19 +255,24 @@ for period_value, period_type in periods:
         continue
 
 results_df = pd.DataFrame(results)
+results_df = results_df.sort_values('period') # Sort the DataFrame by the 'period' column
+
+# Convert 'period' column to categorical type with the custom order
+results_df['period'] = pd.Categorical(results_df['period'], categories=period_order, ordered=True)
+
 st.write("Results DataFrame:")
 st.write(results_df)
 st.write(results_df.dtypes)
 
 # Display charts
 st.header("Polling Results Over Time")
-create_line_chart(results_df, ['harris_poll', 'trump_poll'], "Polling Results Over Time")
+create_line_chart(results_df, ['harris', 'trump'], "Polling Results Over Time")
 
 st.header("Favorability Over Time")
 create_line_chart(results_df, ['harris_fav', 'trump_fav'], "Favorability Over Time")
 
 st.header("Combined Analysis Over Time")
-create_line_chart(results_df, ['harris_poll', 'trump_poll'], "Combined Analysis Over Time")
+create_line_chart(results_df, ['harris', 'trump'], "Combined Analysis Over Time")
 
 # Display raw data
 st.header("Raw Data")
