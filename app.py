@@ -34,6 +34,10 @@ population_weights = {
     'a': 0.3333333333333333, 'all': 0.3333333333333333
 }
 
+# Add color constants
+TRUMP_COLOR = '#D13838'
+HARRIS_COLOR = '#3838D1'
+
 # Utility functions
 @st.cache_data
 def download_csv_data(url):
@@ -199,14 +203,20 @@ def create_line_chart(df, y_columns, title):
     y_min = df[y_columns].min().min() - 0.5
     y_max = df[y_columns].max().max() + 0.5
 
-    # Create a line chart using Altair with normalized Y-axis limits
+    # Create a color scale
+    color_scale = alt.Scale(
+        domain=['harris', 'trump'],
+        range=[HARRIS_COLOR, TRUMP_COLOR]
+    )
+
+    # Create a line chart using Altair with normalized Y-axis limits and custom colors
     chart = alt.Chart(df).transform_fold(
         y_columns,
         as_=['candidate', 'value']
     ).mark_line().encode(
         x=alt.X('period:N', sort=period_order, title='Period'),
         y=alt.Y('value:Q', scale=alt.Scale(domain=[y_min, y_max]), title='Polling Percentage'),
-        color='candidate:N'
+        color=alt.Color('candidate:N', scale=color_scale)
     ).properties(
         width=600,
         height=400,
@@ -272,24 +282,28 @@ for period_value, period_type in periods:
         continue
 
 results_df = pd.DataFrame(results)
-results_df = results_df.sort_values('period') # Sort the DataFrame by the 'period' column
 
-# Convert 'period' column to categorical type with the custom order
-results_df['period'] = pd.Categorical(results_df['period'], categories=period_order, ordered=True)
+if not results_df.empty:
+    results_df = results_df.sort_values('period') # Sort the DataFrame by the 'period' column
 
-st.write("Results DataFrame:")
-st.write(results_df)
-st.write(results_df.dtypes)
+    # Convert 'period' column to categorical type with the custom order
+    results_df['period'] = pd.Categorical(results_df['period'], categories=period_order, ordered=True)
 
-# Display charts
-st.header("Polling Results Over Time")
-create_line_chart(results_df, ['harris', 'trump'], "Polling Results Over Time")
+    st.write("Results DataFrame:")
+    st.write(results_df)
+    st.write(results_df.dtypes)
 
-st.header("Favorability Over Time")
-create_line_chart(results_df, ['harris_fav', 'trump_fav'], "Favorability Over Time")
+    # Display charts
+    st.header("Polling Results Over Time")
+    create_line_chart(results_df, ['harris', 'trump'], "Polling Results Over Time")
 
-st.header("Combined Analysis Over Time")
-create_line_chart(results_df, ['harris', 'trump'], "Combined Analysis Over Time")
+    st.header("Favorability Over Time")
+    create_line_chart(results_df, ['harris', 'trump'], "Favorability Over Time")
+
+    st.header("Combined Analysis Over Time")
+    create_line_chart(results_df, ['harris', 'trump'], "Combined Analysis Over Time")
+else:
+    st.write("No data available for the selected periods.")
 
 # Display raw data
 st.header("Raw Data")
