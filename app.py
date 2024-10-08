@@ -112,7 +112,7 @@ def create_differential_bar_chart(df):
     # Differential bars
     bars = base.mark_bar(size=30).encode(
         y=alt.Y('differential:Q', 
-                title='Differential (Harris - Trump)', 
+                title='Trump            Harris', 
                 scale=alt.Scale(domain=[y_min, y_max])),
         color=alt.condition(
             alt.datum.differential > 0,
@@ -122,18 +122,30 @@ def create_differential_bar_chart(df):
         tooltip=[alt.Tooltip('differential_label:N', title='Results')]
     )
 
-    # MOE areas
-    moe_area = base.mark_area(opacity=0.3).encode(
-        y=alt.Y('low:Q'),
-        y2=alt.Y2('high:Q'),
-        color=alt.condition(
-            alt.datum.differential > 0,
-            alt.value(HARRIS_COLOR_LIGHT),
-            alt.value(TRUMP_COLOR_LIGHT)
-        )
+    # Trump MOE area (negative side)
+    trump_moe_area = base.mark_area(
+        opacity=0.25,
+        color=TRUMP_COLOR_LIGHT
+    ).encode(
+        y=alt.Y('zero:Q'),
+        y2=alt.Y2('low:Q')
     ).transform_calculate(
-        low='datum.differential - datum.harris_moe - datum.trump_moe',
-        high='datum.differential + datum.harris_moe + datum.trump_moe'
+        zero='(datum.differential/datum.trump_moe)',
+        low='datum.trump_moe*-1'
+        # low='datum.differential - datum.harris_moe - datum.trump_moe',
+    )
+
+    # Harris MOE area (positive side)
+    harris_moe_area = base.mark_area(
+        opacity=0.25,
+        color=HARRIS_COLOR_LIGHT
+    ).encode(
+        y=alt.Y('zero:Q'),
+        y2=alt.Y2('high:Q')
+    ).transform_calculate(
+        zero='(datum.differential/datum.harris_moe)-1',
+        high='datum.harris_moe'
+        # high='datum.differential + datum.harris_moe + datum.trump_moe'
     )
 
     # Zero line
@@ -162,7 +174,8 @@ def create_differential_bar_chart(df):
 
     # Combine all chart elements
     final_chart = alt.layer(
-        moe_area,
+        trump_moe_area,
+        harris_moe_area,
         bars,
         zero_line,
         text_labels
