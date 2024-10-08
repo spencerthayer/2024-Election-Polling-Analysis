@@ -251,15 +251,15 @@ st.title("Election Polling Analysis")
 results_df = run_analysis()
 
 if not results_df.empty:
-    st.write("Results DataFrame:")
-    st.write(results_df)
-    # st.write("Data types of results:", results_df.dtypes)
+
+    st.header("Differential Analysis")
+    create_differential_bar_chart(results_df)
 
     st.header("Polling Results Over Time")
     create_line_chart(results_df, ['harris', 'trump'], "Polling Results Over Time")
 
     st.header("Favorability Over Time")
-    st.write("Favorability data:", results_df[['period', 'harris_fav', 'trump_fav']])
+    # st.write("Favorability data:", results_df[['period', 'harris_fav', 'trump_fav']])
     if results_df['harris_fav'].sum() == 0 and results_df['trump_fav'].sum() == 0:
         st.warning("No favorability data available. Check the calculation in analysis.py")
     else:
@@ -270,16 +270,17 @@ if not results_df.empty:
 
     st.header("Grouped Analysis")
     create_grouped_bar_chart(results_df)
+    
+    st.write("Results DataFrame:")
+    st.write(results_df)
+    # st.write("Data types of results:", results_df.dtypes)
 
-    st.header("Differential Analysis")
-    create_differential_bar_chart(results_df)
-
-    st.header("Comparison with Terminal Output")
-    for _, row in results_df.iterrows():
-        st.write(f"{row['period']:<4} H∙{row['harris']:5.2f}%±{row['harris_moe']:.2f} "
-                 f"T∙{row['trump']:5.2f}%±{row['trump_moe']:.2f} "
-                 f"{abs(row['harris'] - row['trump']):+5.2f} "
-                 f"{'Harris' if row['harris'] > row['trump'] else 'Trump'}")
+    # st.header("Comparison with Terminal Output")
+    # for _, row in results_df.iterrows():
+    #     st.write(f"{row['period']:<4} H∙{row['harris']:5.2f}%±{row['harris_moe']:.2f} "
+    #              f"T∙{row['trump']:5.2f}%±{row['trump_moe']:.2f} "
+    #              f"{abs(row['harris'] - row['trump']):+5.2f} "
+    #              f"{'Harris' if row['harris'] > row['trump'] else 'Trump'}")
 
 else:
     st.write("No data available for the selected periods.")
