@@ -130,7 +130,7 @@ def create_differential_bar_chart(df):
         y=alt.Y('zero:Q'),
         y2=alt.Y2('low:Q')
     ).transform_calculate(
-        zero='(datum.differential/datum.trump_moe)',
+        zero='(datum.trump_moe/2)',
         low='datum.trump_moe*-1'
         # low='datum.differential - datum.harris_moe - datum.trump_moe',
     )
@@ -143,7 +143,7 @@ def create_differential_bar_chart(df):
         y=alt.Y('zero:Q'),
         y2=alt.Y2('high:Q')
     ).transform_calculate(
-        zero='(datum.differential/datum.harris_moe)-1',
+        zero='(datum.harris_moe/2)*-1',
         high='datum.harris_moe'
         # high='datum.differential + datum.harris_moe + datum.trump_moe'
     )
