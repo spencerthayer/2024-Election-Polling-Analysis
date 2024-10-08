@@ -94,21 +94,23 @@ def create_stacked_bar_chart(df):
 def create_differential_bar_chart(df):
     df['differential'] = df['harris'] - df['trump']
     df['differential_label'] = df.apply(
-        lambda row: f"{row['harris']:.2f}%±{row['harris_moe']:.2f} vs {row['trump']:.2f}%±{row['trump_moe']:.2f}",
-        axis=1
-    )
-    df['result_label'] = df.apply(
-        lambda row: f"{abs(row['differential']):.2f} {'Harris' if row['differential'] > 0 else 'Trump'}",
+        lambda row: f"H: {row['harris']:.2f}%±{row['harris_moe']:.2f}\nT: {row['trump']:.2f}%±{row['trump_moe']:.2f}",
         axis=1
     )
 
     # Calculate the symmetric range around zero
     max_abs_diff = max(abs(df['differential'].min()), abs(df['differential'].max()))
-    y_min = -max_abs_diff - 0.25
-    y_max = max_abs_diff + 0.25
+    max_moe = max(df['harris_moe'].max(), df['trump_moe'].max())
+    y_range = max(max_abs_diff, max_moe) + 1  # Add 1 for some padding
+    y_min, y_max = -y_range, y_range
 
-    bar_chart = alt.Chart(df).mark_bar().encode(
-        x=alt.X('period:N', sort=period_order, title='Period'),
+    # Base chart
+    base = alt.Chart(df).encode(
+        x=alt.X('period:N', sort=period_order, title='Period')
+    )
+
+    # Differential bars
+    bars = base.mark_bar(size=30).encode(
         y=alt.Y('differential:Q', 
                 title='Differential (Harris - Trump)', 
                 scale=alt.Scale(domain=[y_min, y_max])),
@@ -117,58 +119,58 @@ def create_differential_bar_chart(df):
             alt.value(HARRIS_COLOR),
             alt.value(TRUMP_COLOR)
         ),
-        tooltip=[
-            alt.Tooltip('differential_label:N', title='Differential'),
-            alt.Tooltip('harris:Q', format='.2f', title='Harris (%)'),
-            alt.Tooltip('trump:Q', format='.2f', title='Trump (%)'),
-            alt.Tooltip('harris_moe:Q', format='.2f', title='Harris MOE'),
-            alt.Tooltip('trump_moe:Q', format='.2f', title='Trump MOE')
-        ]
-    ).properties(
-        title="Differential Between Harris and Trump Over Time",
-        width=600,
-        height=400
+        tooltip=[alt.Tooltip('differential_label:N', title='Results')]
     )
 
-    # Add a horizontal line at y=0
-    zero_line = alt.Chart(pd.DataFrame({'y': [0]})).mark_rule(color='white').encode(y='y')
-
-    # Text labels for positive differentials
-    positive_labels = alt.Chart(df[df['differential'] > 0]).transform_calculate(
-        prepended_label="'±' + datum.result_label"
-    ).mark_text(
-        align='center',
-        dx=0,
-        dy=-10,
-        angle=0,
-        fontSize=20,
-        fontWeight='bold'
-    ).encode(
-        x=alt.X('period:N', sort=period_order),
-        y=alt.Y('differential:Q'),
-        text=alt.Text('prepended_label:N'),
-        color=alt.value(HARRIS_COLOR)
+    # MOE areas
+    moe_area = base.mark_area(opacity=0.3).encode(
+        y=alt.Y('low:Q'),
+        y2=alt.Y2('high:Q'),
+        color=alt.condition(
+            alt.datum.differential > 0,
+            alt.value(HARRIS_COLOR_LIGHT),
+            alt.value(TRUMP_COLOR_LIGHT)
+        )
+    ).transform_calculate(
+        low='datum.differential - datum.harris_moe - datum.trump_moe',
+        high='datum.differential + datum.harris_moe + datum.trump_moe'
     )
 
-    # Text labels for negative differentials
-    negative_labels = alt.Chart(df[df['differential'] <= 0]).transform_calculate(
-        prepended_label="'±' + datum.result_label"
-    ).mark_text(
+    # Zero line
+    zero_line = alt.Chart(pd.DataFrame({'y': [0]})).mark_rule(
+        color='black', 
+        strokeWidth=1,
+        strokeDash=[5, 5]
+    ).encode(y='y')
+
+    # Text labels
+    text_labels = base.mark_text(
         align='center',
-        dx=0,
-        dy=10,
-        angle=0,
-        fontSize=20,
+        baseline='middle',
+        dy=alt.expr('datum.differential > 0 ? -10 : 10'),
+        fontSize=12,
         fontWeight='bold'
     ).encode(
-        x=alt.X('period:N', sort=period_order),
         y=alt.Y('differential:Q'),
-        text=alt.Text('prepended_label:N'),
-        color=alt.value(TRUMP_COLOR)
+        text=alt.Text('differential:Q', format='+.2f'),
+        color=alt.condition(
+            alt.datum.differential > 0,
+            alt.value(HARRIS_COLOR),
+            alt.value(TRUMP_COLOR)
+        )
     )
 
     # Combine all chart elements
-    final_chart = alt.layer(bar_chart, zero_line, positive_labels, negative_labels)
+    final_chart = alt.layer(
+        moe_area,
+        bars,
+        zero_line,
+        text_labels
+    ).properties(
+        title="Differential Between Harris and Trump Over Time",
+        width=800,
+        height=400
+    )
 
     st.altair_chart(final_chart, use_container_width=True)
 # END create_differential_bar_chart
