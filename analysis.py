@@ -26,7 +26,7 @@ skip_color = 3
 
 # Define the time decay weighting
 decay_rate = 2
-half_life_days = 28
+half_life_days = 7
 
 # Constants for the weighting calculations
 partisan_weight = {True: 0.1, False: 1}

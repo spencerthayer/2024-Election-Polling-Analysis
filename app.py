@@ -138,7 +138,6 @@ def create_differential_bar_chart(df):
     ).transform_calculate(
         zero='datum.trump_moe*((100-(datum.differential*10))*.01)*1',
         low='datum.trump_moe*-1'
-        # low='datum.differential - datum.harris_moe - datum.trump_moe',
     )
 
     # Harris MOE area (positive side)
@@ -151,8 +150,7 @@ def create_differential_bar_chart(df):
     ).transform_calculate(
         # zero='datum.harris_moe * {def_calc} *-1',
         zero=f'datum.harris_moe*((100-(datum.differential*10))*.01)*-1',
-        high='datum.harris_moe'
-        # high='datum.differential + datum.harris_moe + datum.trump_moe'
+        high='datum.harris_moe'\
     )
 
     # Zero line
