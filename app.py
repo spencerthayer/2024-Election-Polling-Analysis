@@ -24,12 +24,17 @@ TRUMP_COLOR_LIGHT = "#FFA07A"
 HARRIS_COLOR = "#3838D1"
 HARRIS_COLOR_LIGHT = "#6495ED"
 
-# Define a custom order for the periods
 period_order = [
-    '1 days', '3 days', '7 days', '14 days', '21 days',
-    '1 months', '3 months', '6 months', '12 months'
+    '12 months',
+    '6 months',
+    '3 months',
+    '1 months',
+    '21 days',
+    '14 days',
+    '7 days',
+    '3 days',
+    '1 days'
 ]
-
 # Caching the data download to avoid re-fetching on each rerun
 @st.cache_data
 def load_data():
