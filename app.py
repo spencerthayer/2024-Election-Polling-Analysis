@@ -226,7 +226,7 @@ if not results_df.empty:
         create_line_chart(results_df, ['harris_fav', 'trump_fav'], "Favorability Over Time")
 
     st.header("Combined Analysis Over Time")
-    create_line_chart(results_df, ['harris_combined', 'trump_combined'], "Combined Analysis Over Time")
+    create_line_chart(results_df, ['harris_combined', 'trump_combined', 'harris', 'trump', 'harris_fav', 'trump_fav'], "Combined Analysis Over Time")
 
     st.header("Grouped Analysis")
     create_line_chart(results_df, ['harris', 'trump', 'harris_fav', 'trump_fav'], "Grouped Results Over Time")
