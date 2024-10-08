@@ -215,6 +215,10 @@ results_df = run_analysis()
 if not results_df.empty:
     st.header("Differential Analysis")
     create_differential_bar_chart(results_df)
+    
+    
+    st.header("Combined Analysis Over Time")
+    create_line_chart(results_df, ['harris_combined', 'trump_combined', 'harris', 'trump', 'harris_fav', 'trump_fav'], "Combined Analysis Over Time")
 
     st.header("Polling Results Over Time")
     create_line_chart(results_df, ['harris', 'trump'], "Polling Results Over Time")
@@ -224,9 +228,6 @@ if not results_df.empty:
         st.warning("No favorability data available. Check the calculation in analysis.py")
     else:
         create_line_chart(results_df, ['harris_fav', 'trump_fav'], "Favorability Over Time")
-
-    st.header("Combined Analysis Over Time")
-    create_line_chart(results_df, ['harris_combined', 'trump_combined', 'harris', 'trump', 'harris_fav', 'trump_fav'], "Combined Analysis Over Time")
 
     st.header("Grouped Analysis")
     create_line_chart(results_df, ['harris', 'trump', 'harris_fav', 'trump_fav'], "Grouped Results Over Time")
