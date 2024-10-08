@@ -17,7 +17,7 @@ favorability_url = "https://projects.fivethirtyeight.com/polls/data/favorability
 
 # Data Parsing
 candidate_names = ['Kamala Harris', 'Donald Trump']
-favorability_weight = 0.1  # Global value, but will be overridden when needed
+favorability_weight = 0.1
 heavy_weight = True
 
 # Coloring
@@ -26,14 +26,11 @@ skip_color = 3
 
 # Define the time decay weighting
 decay_rate = 2
-half_life_days = 7
+half_life_days = 14
 
 # Constants for the weighting calculations
-partisan_weight = {True: 0.1, False: 1}
-population_weights = {
-    'lv': 1.0, 'rv': 0.6666666666666666, 'v': 0.5,
-    'a': 0.3333333333333333, 'all': 0.3333333333333333
-}
+partisan_weight = { True: 0.01, False: 1 }
+population_weights = { 'lv': 1.0, 'rv': 0.6666666666666666, 'v': 0.5, 'a': 0.3333333333333333, 'all': 0.3333333333333333 }
 
 def margin_of_error(n, p=0.5, confidence_level=0.95):
     z = norm.ppf((1 + confidence_level) / 2)

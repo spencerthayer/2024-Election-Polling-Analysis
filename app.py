@@ -58,7 +58,7 @@ def create_line_chart(df, y_columns, title):
         range=[HARRIS_COLOR, TRUMP_COLOR, HARRIS_COLOR_LIGHT, TRUMP_COLOR_LIGHT]
     )
 
-    chart = alt.Chart(df_melted).mark_line().encode(
+    chart = alt.Chart(df_melted).mark_line(point=True).encode(
         x=alt.X('period:N', sort=period_order, title='Period'),
         y=alt.Y('value:Q', scale=alt.Scale(domain=[y_min, y_max]), title='Percentage'),
         color=alt.Color('candidate:N', scale=color_scale)
@@ -79,16 +79,19 @@ def create_grouped_bar_chart(df):
         value_name='value'
     )
 
+    y_min = df_melted['value'].min() - 0.5
+    y_max = df_melted['value'].max() + 0.5
+
     # Create the grouped bar chart
-    chart = alt.Chart(df_melted).mark_bar().encode(
-        x=alt.X('period:N', sort=period_order, title='Period'),
-        xOffset='metric:N',  # Offset bars within each period
-        y=alt.Y('value:Q', title='Percentage'),
-        color=alt.Color('metric:N', scale=alt.Scale(
-            domain=['harris', 'trump', 'harris_fav', 'trump_fav'],
-            range=[HARRIS_COLOR, TRUMP_COLOR, HARRIS_COLOR_LIGHT, TRUMP_COLOR_LIGHT]
-        )),
-        tooltip=['period', 'metric', 'value']
+    chart = alt.Chart(df_melted).mark_line(point=True).encode(
+    x=alt.X('period:N', sort=period_order, title='Period'),
+    y=alt.Y('value:Q', scale=alt.Scale(domain=[y_min, y_max]), title='Percentage'),
+    color=alt.Color('metric:N', scale=alt.Scale(
+        domain=['harris', 'trump', 'harris_fav', 'trump_fav'],
+        range=[HARRIS_COLOR, TRUMP_COLOR, HARRIS_COLOR_LIGHT, TRUMP_COLOR_LIGHT]
+    )),
+    tooltip=['period', 'metric', 'value'],
+    detail='metric:N'  # Ensures that each line represents a separate metric
     ).properties(
         width=800,
         height=400,
@@ -116,7 +119,7 @@ def create_differential_bar_chart(df):
     )
 
     # Differential bars
-    bars = base.mark_bar(size=5).encode(
+    bars = base.mark_bar(size=4).encode(
         y=alt.Y('differential:Q', 
                 title='Trump            Harris', 
                 scale=alt.Scale(domain=[y_min, y_max])),
@@ -130,6 +133,7 @@ def create_differential_bar_chart(df):
 
     # Trump MOE area (negative side)
     trump_moe_area = base.mark_area(
+        # point=True,
         opacity=0.25,
         color=TRUMP_COLOR_LIGHT
     ).encode(
@@ -142,6 +146,7 @@ def create_differential_bar_chart(df):
 
     # Harris MOE area (positive side)
     harris_moe_area = base.mark_area(
+        # point=True,
         opacity=0.25,
         color=HARRIS_COLOR_LIGHT
     ).encode(
@@ -165,8 +170,7 @@ def create_differential_bar_chart(df):
         align='center',
         baseline='middle',
         dy=alt.expr('datum.differential > 0 ? -15 : 15'),
-        fontSize=20,
-        fontWeight='normal'
+        fontSize=20
     ).encode(
         y=alt.Y('differential:Q'),
         text=alt.Text('differential:Q', format='+.2f'),
