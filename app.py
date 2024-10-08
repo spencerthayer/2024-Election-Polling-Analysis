@@ -91,7 +91,7 @@ def create_grouped_bar_chart(df):
         tooltip=['period', 'metric', 'value']
     ).properties(
         width=800,
-        height=800,
+        height=400,
         title="Grouped Analysis: Polling and Favorability"
     )
 
@@ -107,7 +107,7 @@ def create_differential_bar_chart(df):
     # Calculate the symmetric range around zero
     max_abs_diff = max(abs(df['differential'].min()), abs(df['differential'].max()))
     max_moe = max(df['harris_moe'].max(), df['trump_moe'].max())
-    y_range = max(max_abs_diff, max_moe) + 1  # Add 1 for some padding
+    y_range = max(max_abs_diff, max_moe) + 0
     y_min, y_max = -y_range, y_range
 
     # Base chart
@@ -188,8 +188,8 @@ def create_differential_bar_chart(df):
         text_labels
     ).properties(
         title="Differential Between Harris and Trump Over Time",
-        width=800,
-        height=400
+        width=600,
+        height=600
     )
 
     st.altair_chart(final_chart, use_container_width=True)
