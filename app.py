@@ -91,7 +91,7 @@ def create_grouped_bar_chart(df):
         tooltip=['period', 'metric', 'value']
     ).properties(
         width=800,
-        height=400,
+        height=800,
         title="Grouped Analysis: Polling and Favorability"
     )
 
@@ -116,7 +116,7 @@ def create_differential_bar_chart(df):
     )
 
     # Differential bars
-    bars = base.mark_bar(size=30).encode(
+    bars = base.mark_bar(size=75).encode(
         y=alt.Y('differential:Q', 
                 title='Trump            Harris', 
                 scale=alt.Scale(domain=[y_min, y_max])),
@@ -136,7 +136,7 @@ def create_differential_bar_chart(df):
         y=alt.Y('zero:Q'),
         y2=alt.Y2('low:Q')
     ).transform_calculate(
-        zero='datum.trump_moe/2',
+        zero='datum.trump_moe*((100-(datum.differential*10))*.01)*1',
         low='datum.trump_moe*-1'
         # low='datum.differential - datum.harris_moe - datum.trump_moe',
     )
@@ -149,16 +149,17 @@ def create_differential_bar_chart(df):
         y=alt.Y('zero:Q'),
         y2=alt.Y2('high:Q')
     ).transform_calculate(
-        zero='datum.harris_moe/2*-1',
+        # zero='datum.harris_moe * {def_calc} *-1',
+        zero=f'datum.harris_moe*((100-(datum.differential*10))*.01)*-1',
         high='datum.harris_moe'
         # high='datum.differential + datum.harris_moe + datum.trump_moe'
     )
 
     # Zero line
     zero_line = alt.Chart(pd.DataFrame({'y': [0]})).mark_rule(
-        color='black', 
+        color='#333333', 
         strokeWidth=1,
-        strokeDash=[5, 5]
+        strokeDash=[10, 5]
     ).encode(y='y')
 
     # Text labels
@@ -166,7 +167,7 @@ def create_differential_bar_chart(df):
         align='center',
         baseline='middle',
         dy=alt.expr('datum.differential > 0 ? -10 : 10'),
-        fontSize=12,
+        fontSize=20,
         fontWeight='bold'
     ).encode(
         y=alt.Y('differential:Q'),
