@@ -35,7 +35,7 @@ period_order = [
     '3 days',
     '1 days'
 ]
-# Caching the data download to avoid re-fetching on each rerun
+
 @st.cache_data
 def load_data():
     polling_df = download_csv_data(POLLING_URL)
@@ -69,56 +69,19 @@ def create_line_chart(df, y_columns, title):
     )
     
     st.altair_chart(chart, use_container_width=True)
-# START create_grouped_bar_chart
-def create_grouped_bar_chart(df):
-    # Melt the dataframe to create a long format suitable for grouping
-    df_melted = df.melt(
-        id_vars=['period'],
-        value_vars=['harris', 'trump', 'harris_fav', 'trump_fav'],
-        var_name='metric',
-        value_name='value'
-    )
 
-    y_min = df_melted['value'].min() - 0.5
-    y_max = df_melted['value'].max() + 0.5
-
-    # Create the grouped bar chart
-    chart = alt.Chart(df_melted).mark_line(point=True).encode(
-    x=alt.X('period:N', sort=period_order, title='Period'),
-    y=alt.Y('value:Q', scale=alt.Scale(domain=[y_min, y_max]), title='Percentage'),
-    color=alt.Color('metric:N', scale=alt.Scale(
-        domain=['harris', 'trump', 'harris_fav', 'trump_fav'],
-        range=[HARRIS_COLOR, TRUMP_COLOR, HARRIS_COLOR_LIGHT, TRUMP_COLOR_LIGHT]
-    )),
-    tooltip=['period', 'metric', 'value'],
-    detail='metric:N'  # Ensures that each line represents a separate metric
-    ).properties(
-        width=800,
-        height=400,
-        title="Grouped Analysis: Polling and Favorability"
-    )
-
-    st.altair_chart(chart, use_container_width=True)
-# START create_differential_bar_chart
 def create_differential_bar_chart(df):
     df['differential'] = df['harris'] - df['trump']
-    # df['differential_label'] = df.apply(
-    #     lambda row: f"H: {row['harris']:.2f}%±{row['harris_moe']:.2f}\nT: {row['trump']:.2f}%±{row['trump_moe']:.2f}",
-    #     axis=1
-    # )
 
-    # Calculate the symmetric range around zero
     max_abs_diff = max(abs(df['differential'].min()), abs(df['differential'].max()))
     max_moe = max(df['harris_moe'].max(), df['trump_moe'].max())
     y_range = max(max_abs_diff, max_moe) + 0
     y_min, y_max = -y_range, y_range
 
-    # Base chart
     base = alt.Chart(df).encode(
         x=alt.X('period:N', sort=period_order, title='Period')
     )
 
-    # Differential bars
     bars = base.mark_bar(size=4).encode(
         y=alt.Y('differential:Q', 
                 title='Trump            Harris', 
@@ -131,9 +94,7 @@ def create_differential_bar_chart(df):
         tooltip=[alt.Tooltip('differential_label:N', title='Results')]
     )
 
-    # Trump MOE area (negative side)
     trump_moe_area = base.mark_area(
-        # point=True,
         opacity=0.25,
         color=TRUMP_COLOR_LIGHT
     ).encode(
@@ -144,28 +105,23 @@ def create_differential_bar_chart(df):
         low='datum.trump_moe*-1'
     )
 
-    # Harris MOE area (positive side)
     harris_moe_area = base.mark_area(
-        # point=True,
         opacity=0.25,
         color=HARRIS_COLOR_LIGHT
     ).encode(
         y=alt.Y('zero:Q'),
         y2=alt.Y2('high:Q')
     ).transform_calculate(
-        # zero='datum.harris_moe * {def_calc} *-1',
         zero=f'datum.harris_moe*((100-(datum.differential*10))*.01)*-1',
-        high='datum.harris_moe'\
+        high='datum.harris_moe'
     )
 
-    # Zero line
     zero_line = alt.Chart(pd.DataFrame({'y': [0]})).mark_rule(
         color='#666', 
         strokeWidth=1,
         strokeDash=[10, 5]
     ).encode(y='y')
 
-    # Text labels
     text_labels = base.mark_text(
         align='center',
         baseline='middle',
@@ -181,7 +137,6 @@ def create_differential_bar_chart(df):
         )
     )
 
-    # Combine all chart elements
     final_chart = alt.layer(
         trump_moe_area,
         harris_moe_area,
@@ -195,7 +150,7 @@ def create_differential_bar_chart(df):
     )
 
     st.altair_chart(final_chart, use_container_width=True)
-# END create_differential_bar_chart
+
 @st.cache_data
 def run_analysis():
     try:
@@ -226,19 +181,18 @@ def run_analysis():
             favorability_differential = calculate_favorability_differential(period_favorability_df, candidate_names)
             combined_results = combine_analysis(polling_metrics, favorability_differential, favorability_weight)
             
-            # st.write(f"Data for {period_value} {period_type}:")
-            # st.write("Polling metrics:", polling_metrics)
-            # st.write("Favorability differential:", favorability_differential)
-            # st.write("Combined results:", combined_results)
-            
             results.append({
                 'period': f"{period_value} {period_type}",
-                'harris': combined_results['Kamala Harris'][0],
-                'trump': combined_results['Donald Trump'][0],
+                'harris': polling_metrics['Kamala Harris'][0],
+                'trump': polling_metrics['Donald Trump'][0],
                 'harris_fav': favorability_differential.get('Kamala Harris', 0),
                 'trump_fav': favorability_differential.get('Donald Trump', 0),
-                'harris_moe': combined_results['Kamala Harris'][1],
-                'trump_moe': combined_results['Donald Trump'][1]
+                'harris_moe': polling_metrics['Kamala Harris'][1],
+                'trump_moe': polling_metrics['Donald Trump'][1],
+                'harris_combined': combined_results['Kamala Harris'][0],
+                'trump_combined': combined_results['Donald Trump'][0],
+                'harris_combined_moe': combined_results['Kamala Harris'][1],
+                'trump_combined_moe': combined_results['Donald Trump'][1]
             })
 
         results_df = pd.DataFrame(results)
@@ -259,7 +213,6 @@ st.title("Election Polling Analysis")
 results_df = run_analysis()
 
 if not results_df.empty:
-
     st.header("Differential Analysis")
     create_differential_bar_chart(results_df)
 
@@ -267,28 +220,19 @@ if not results_df.empty:
     create_line_chart(results_df, ['harris', 'trump'], "Polling Results Over Time")
 
     st.header("Favorability Over Time")
-    # st.write("Favorability data:", results_df[['period', 'harris_fav', 'trump_fav']])
     if results_df['harris_fav'].sum() == 0 and results_df['trump_fav'].sum() == 0:
         st.warning("No favorability data available. Check the calculation in analysis.py")
     else:
         create_line_chart(results_df, ['harris_fav', 'trump_fav'], "Favorability Over Time")
 
     st.header("Combined Analysis Over Time")
-    create_line_chart(results_df, ['harris', 'trump'], "Combined Analysis Over Time")
+    create_line_chart(results_df, ['harris_combined', 'trump_combined'], "Combined Analysis Over Time")
 
     st.header("Grouped Analysis")
-    create_grouped_bar_chart(results_df)
+    create_line_chart(results_df, ['harris', 'trump', 'harris_fav', 'trump_fav'], "Grouped Results Over Time")
     
     st.write("Results DataFrame:")
     st.write(results_df)
-    # st.write("Data types of results:", results_df.dtypes)
-
-    # st.header("Comparison with Terminal Output")
-    # for _, row in results_df.iterrows():
-    #     st.write(f"{row['period']:<4} H∙{row['harris']:5.2f}%±{row['harris_moe']:.2f} "
-    #              f"T∙{row['trump']:5.2f}%±{row['trump_moe']:.2f} "
-    #              f"{abs(row['harris'] - row['trump']):+5.2f} "
-    #              f"{'Harris' if row['harris'] > row['trump'] else 'Trump'}")
 
 else:
     st.write("No data available for the selected periods.")
