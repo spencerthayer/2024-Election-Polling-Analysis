@@ -34,7 +34,7 @@ period_order = [
     '7 days',
     '3 days',
     '1 days'
-]
+    ]
 
 @st.cache_data
 def load_data():
