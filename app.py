@@ -53,10 +53,17 @@ def create_line_chart(df, y_columns, title):
     y_min = df_melted['value'].min() - 0.5
     y_max = df_melted['value'].max() + 0.5
 
-    color_scale = alt.Scale(
-        domain=y_columns,
-        range=[HARRIS_COLOR, TRUMP_COLOR, HARRIS_COLOR_LIGHT, TRUMP_COLOR_LIGHT]
-    )
+    if len(y_columns) == 6:
+        color_scale = alt.Scale(
+            domain=y_columns,
+            range=[HARRIS_COLOR_DARK, HARRIS_COLOR, HARRIS_COLOR_LIGHT, 
+                   TRUMP_COLOR_DARK, TRUMP_COLOR, TRUMP_COLOR_LIGHT]
+        )
+    else:
+        color_scale = alt.Scale(
+            domain=y_columns,
+            range=[HARRIS_COLOR, TRUMP_COLOR, HARRIS_COLOR_LIGHT, TRUMP_COLOR_LIGHT]
+        )
 
     chart = alt.Chart(df_melted).mark_line(point=True).encode(
         x=alt.X('period:N', sort=period_order, title='Period'),
@@ -69,7 +76,7 @@ def create_line_chart(df, y_columns, title):
     )
     
     st.altair_chart(chart, use_container_width=True)
-
+    
 def create_differential_bar_chart(df):
     df['differential'] = df['harris'] - df['trump']
 
@@ -218,7 +225,14 @@ if not results_df.empty:
     
     
     st.header("Combined Analysis Over Time")
-    create_line_chart(results_df, ['harris_combined', 'trump_combined', 'harris', 'trump', 'harris_fav', 'trump_fav'], "Combined Analysis Over Time")
+    create_line_chart(results_df, [
+        'harris',
+        'harris_combined',
+        'harris_fav',
+        'trump',
+        'trump_combined',
+        'trump_fav'
+        ], "Combined Analysis Over Time")
 
     st.header("Polling Results Over Time")
     create_line_chart(results_df, ['harris', 'trump'], "Polling Results Over Time")
