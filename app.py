@@ -19,8 +19,10 @@ from analysis import (
 # Constants
 POLLING_URL = "https://projects.fivethirtyeight.com/polls/data/president_polls.csv"
 FAVORABILITY_URL = "https://projects.fivethirtyeight.com/polls/data/favorability_polls.csv"
-TRUMP_COLOR = '#D13838'
-HARRIS_COLOR = '#3838D1'
+TRUMP_COLOR = "#D13838"
+TRUMP_COLOR_LIGHT = "#FFA07A"
+HARRIS_COLOR = "#3838D1"
+HARRIS_COLOR_LIGHT = "#6495ED"
 
 # Define a custom order for the periods
 period_order = [
@@ -48,7 +50,7 @@ def create_line_chart(df, y_columns, title):
 
     color_scale = alt.Scale(
         domain=y_columns,
-        range=[HARRIS_COLOR, TRUMP_COLOR, '#6495ED', '#FFA07A']
+        range=[HARRIS_COLOR, TRUMP_COLOR, HARRIS_COLOR_LIGHT, TRUMP_COLOR_LIGHT]
     )
 
     chart = alt.Chart(df_melted).mark_line().encode(
@@ -78,7 +80,7 @@ def create_stacked_bar_chart(df):
         y=alt.Y('value:Q', title='Percentage'),
         color=alt.Color('metric:N', scale=alt.Scale(
             domain=['harris', 'trump', 'harris_fav', 'trump_fav'],
-            range=[HARRIS_COLOR, TRUMP_COLOR, '#6495ED', '#FFA07A']
+            range=[HARRIS_COLOR, TRUMP_COLOR, HARRIS_COLOR_LIGHT, TRUMP_COLOR_LIGHT]
         )),
         tooltip=['period', 'metric', 'value']
     ).properties(
@@ -88,24 +90,28 @@ def create_stacked_bar_chart(df):
     )
 
     st.altair_chart(chart, use_container_width=True)
-
+# START create_differential_bar_chart
 def create_differential_bar_chart(df):
     df['differential'] = df['harris'] - df['trump']
     df['differential_label'] = df.apply(
-        lambda row: f"{row['harris']:.2f}%±{row['harris_moe']:.2f} vs {row['trump']:.2f}%±{row['trump_moe']:.2f} ({'Harris' if row['differential'] > 0 else 'Trump'})",
+        lambda row: f"{row['harris']:.2f}%±{row['harris_moe']:.2f} vs {row['trump']:.2f}%±{row['trump_moe']:.2f}",
+        axis=1
+    )
+    df['result_label'] = df.apply(
+        lambda row: f"{abs(row['differential']):.2f} {'Harris' if row['differential'] > 0 else 'Trump'}",
         axis=1
     )
 
     # Calculate the symmetric range around zero
     max_abs_diff = max(abs(df['differential'].min()), abs(df['differential'].max()))
-    x_min = -max_abs_diff - 0.5
-    x_max = max_abs_diff + 0.5
+    y_min = -max_abs_diff - 0.25
+    y_max = max_abs_diff + 0.25
 
     bar_chart = alt.Chart(df).mark_bar().encode(
         x=alt.X('period:N', sort=period_order, title='Period'),
         y=alt.Y('differential:Q', 
                 title='Differential (Harris - Trump)', 
-                scale=alt.Scale(domain=[x_min, x_max])),
+                scale=alt.Scale(domain=[y_min, y_max])),
         color=alt.condition(
             alt.datum.differential > 0,
             alt.value(HARRIS_COLOR),
@@ -124,14 +130,48 @@ def create_differential_bar_chart(df):
         height=400
     )
 
-    # Add a vertical line at x=0
+    # Add a horizontal line at y=0
     zero_line = alt.Chart(pd.DataFrame({'y': [0]})).mark_rule(color='white').encode(y='y')
 
-    # Combine the bar chart and the zero line
-    final_chart = alt.layer(bar_chart, zero_line)
+    # Text labels for positive differentials
+    positive_labels = alt.Chart(df[df['differential'] > 0]).transform_calculate(
+        prepended_label="'±' + datum.result_label"
+    ).mark_text(
+        align='center',
+        dx=0,
+        dy=-10,
+        angle=0,
+        fontSize=20,
+        fontWeight='bold'
+    ).encode(
+        x=alt.X('period:N', sort=period_order),
+        y=alt.Y('differential:Q'),
+        text=alt.Text('prepended_label:N'),
+        color=alt.value(HARRIS_COLOR)
+    )
+
+    # Text labels for negative differentials
+    negative_labels = alt.Chart(df[df['differential'] <= 0]).transform_calculate(
+        prepended_label="'±' + datum.result_label"
+    ).mark_text(
+        align='center',
+        dx=0,
+        dy=10,
+        angle=0,
+        fontSize=20,
+        fontWeight='bold'
+    ).encode(
+        x=alt.X('period:N', sort=period_order),
+        y=alt.Y('differential:Q'),
+        text=alt.Text('prepended_label:N'),
+        color=alt.value(TRUMP_COLOR)
+    )
+
+    # Combine all chart elements
+    final_chart = alt.layer(bar_chart, zero_line, positive_labels, negative_labels)
 
     st.altair_chart(final_chart, use_container_width=True)
-
+# END create_differential_bar_chart
 @st.cache_data
 def run_analysis():
     try:
