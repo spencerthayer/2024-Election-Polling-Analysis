@@ -17,6 +17,9 @@ from analysis import (
 )
 
 # Constants
+POLLING_URL = "https://projects.fivethirtyeight.com/polls/data/president_polls.csv"
+FAVORABILITY_URL = "https://projects.fivethirtyeight.com/polls/data/favorability_polls.csv"
+
 TRUMP_COLOR_DARK = "#8B0000"
 TRUMP_COLOR = "#D13838"
 TRUMP_COLOR_LIGHT = "#FFA07A"
