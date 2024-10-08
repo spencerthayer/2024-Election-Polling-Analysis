@@ -157,7 +157,7 @@ def create_differential_bar_chart(df):
 
     # Zero line
     zero_line = alt.Chart(pd.DataFrame({'y': [0]})).mark_rule(
-        color='#333333', 
+        color='#666', 
         strokeWidth=1,
         strokeDash=[10, 5]
     ).encode(y='y')
