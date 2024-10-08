@@ -99,10 +99,10 @@ def create_grouped_bar_chart(df):
 # START create_differential_bar_chart
 def create_differential_bar_chart(df):
     df['differential'] = df['harris'] - df['trump']
-    df['differential_label'] = df.apply(
-        lambda row: f"H: {row['harris']:.2f}%±{row['harris_moe']:.2f}\nT: {row['trump']:.2f}%±{row['trump_moe']:.2f}",
-        axis=1
-    )
+    # df['differential_label'] = df.apply(
+    #     lambda row: f"H: {row['harris']:.2f}%±{row['harris_moe']:.2f}\nT: {row['trump']:.2f}%±{row['trump_moe']:.2f}",
+    #     axis=1
+    # )
 
     # Calculate the symmetric range around zero
     max_abs_diff = max(abs(df['differential'].min()), abs(df['differential'].max()))
@@ -116,7 +116,7 @@ def create_differential_bar_chart(df):
     )
 
     # Differential bars
-    bars = base.mark_bar(size=75).encode(
+    bars = base.mark_bar(size=5).encode(
         y=alt.Y('differential:Q', 
                 title='Trump            Harris', 
                 scale=alt.Scale(domain=[y_min, y_max])),
@@ -166,9 +166,9 @@ def create_differential_bar_chart(df):
     text_labels = base.mark_text(
         align='center',
         baseline='middle',
-        dy=alt.expr('datum.differential > 0 ? -10 : 10'),
+        dy=alt.expr('datum.differential > 0 ? -15 : 15'),
         fontSize=20,
-        fontWeight='bold'
+        fontWeight='normal'
     ).encode(
         y=alt.Y('differential:Q'),
         text=alt.Text('differential:Q', format='+.2f'),
@@ -189,7 +189,7 @@ def create_differential_bar_chart(df):
     ).properties(
         title="Differential Between Harris and Trump Over Time",
         width=600,
-        height=600
+        height=500
     )
 
     st.altair_chart(final_chart, use_container_width=True)
