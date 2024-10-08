@@ -96,9 +96,16 @@ def create_differential_bar_chart(df):
         axis=1
     )
 
+    # Calculate the symmetric range around zero
+    max_abs_diff = max(abs(df['differential'].min()), abs(df['differential'].max()))
+    x_min = -max_abs_diff - 0.5
+    x_max = max_abs_diff + 0.5
+
     bar_chart = alt.Chart(df).mark_bar().encode(
-        x=alt.X('differential:Q', title='Differential (Harris - Trump)', scale=alt.Scale(domain=[-10, 10])),
-        y=alt.Y('period:N', sort=period_order, title='Period'),
+        x=alt.X('period:N', sort=period_order, title='Period'),
+        y=alt.Y('differential:Q', 
+                title='Differential (Harris - Trump)', 
+                scale=alt.Scale(domain=[x_min, x_max])),
         color=alt.condition(
             alt.datum.differential > 0,
             alt.value(HARRIS_COLOR),
@@ -113,11 +120,17 @@ def create_differential_bar_chart(df):
         ]
     ).properties(
         title="Differential Between Harris and Trump Over Time",
-        width=800,
+        width=600,
         height=400
     )
 
-    st.altair_chart(bar_chart, use_container_width=True)
+    # Add a vertical line at x=0
+    zero_line = alt.Chart(pd.DataFrame({'y': [0]})).mark_rule(color='white').encode(y='y')
+
+    # Combine the bar chart and the zero line
+    final_chart = alt.layer(bar_chart, zero_line)
+
+    st.altair_chart(final_chart, use_container_width=True)
 
 @st.cache_data
 def run_analysis():
