@@ -6,7 +6,7 @@ import logging
 CANDIDATE_NAMES = ['Kamala Harris', 'Donald Trump']
 
 # Weight given to favorability in the combined analysis (between 0 and 1)
-FAVORABILITY_WEIGHT = 0.2
+FAVORABILITY_WEIGHT = 0.25
 
 # Flag to control weighting strategy (True for multiplicative, False for additive)
 HEAVY_WEIGHT = True

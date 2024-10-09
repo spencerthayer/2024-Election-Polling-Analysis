@@ -5,7 +5,6 @@ import numpy as np
 import requests
 from io import StringIO
 import logging
-from datetime import datetime
 from typing import Dict, List, Tuple, Any, Optional, Callable, Union
 from scipy.stats import norm
 from sklearn.ensemble import RandomForestRegressor
@@ -43,8 +42,9 @@ def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = Non
     Preprocess the data by converting date columns, handling missing values, and calculating necessary weights.
     """
     df = df.copy()
-    # Parse 'created_at' column
-    df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce', utc=True)
+    # Specify the date format based on your data
+    date_format = '%m/%d/%y %H:%M'
+    df['created_at'] = pd.to_datetime(df['created_at'], format=date_format, errors='coerce', utc=True)
     df = df.dropna(subset=['created_at'])
     if start_period is not None:
         df = df[df['created_at'] >= start_period]
