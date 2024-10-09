@@ -97,7 +97,7 @@ def create_differential_bar_chart(df: pd.DataFrame):
 
     max_abs_diff = max(abs(df['differential'].min()), abs(df['differential'].max()))
     max_moe = max(df['harris_moe'].max(), df['trump_moe'].max())
-    y_range = max(max_abs_diff, max_moe) + 1
+    y_range = max(max_abs_diff, max_moe) + 0
     y_min, y_max = -y_range, y_range
 
     base = alt.Chart(df).encode(
