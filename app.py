@@ -34,7 +34,7 @@ def load_and_process_data() -> pd.DataFrame:
 
 def create_line_chart(df: pd.DataFrame, y_columns: list, title: str):
     """
-    Creates a line chart using Altair.
+    Creates a line chart using Altair with the formatting from version 1.
 
     Args:
         df (pd.DataFrame): DataFrame containing the data to plot.
@@ -56,25 +56,17 @@ def create_line_chart(df: pd.DataFrame, y_columns: list, title: str):
     y_min = df_melted['value'].min() - 0.5
     y_max = df_melted['value'].max() + 0.5
 
-    # Adjust color_scale based on the number of y_columns
-    color_range = []
-    for col in y_columns:
-        if 'harris' in col.lower():
-            if 'fav' in col.lower():
-                color_range.append(HARRIS_COLOR_LIGHT)
-            else:
-                color_range.append(HARRIS_COLOR)
-        elif 'trump' in col.lower():
-            if 'fav' in col.lower():
-                color_range.append(TRUMP_COLOR_LIGHT)
-            else:
-                color_range.append(TRUMP_COLOR)
-        else:
-            color_range.append('gray')  # Default color
-
+    # Adjust color_scale based on candidate and data type
     color_scale = alt.Scale(
         domain=y_columns,
-        range=color_range
+        range=[
+            HARRIS_COLOR,            # harris_polling
+            HARRIS_COLOR_LIGHT,      # harris_fav
+            HARRIS_COLOR_DARK,       # harris_combined
+            TRUMP_COLOR,             # trump_polling
+            TRUMP_COLOR_LIGHT,       # trump_fav
+            TRUMP_COLOR_DARK         # trump_combined
+        ][:len(y_columns)]  # Ensure the range matches the number of y_columns
     )
 
     chart = alt.Chart(df_melted).mark_line(point=True).encode(
@@ -91,48 +83,68 @@ def create_line_chart(df: pd.DataFrame, y_columns: list, title: str):
 
 def create_differential_bar_chart(df: pd.DataFrame):
     """
-    Creates a differential bar chart using Altair.
+    Creates a differential bar chart using Altair with the formatting from version 1.
 
     Args:
         df (pd.DataFrame): DataFrame containing the data to plot.
     """
-    df = df.dropna(subset=['harris', 'trump'])
-    df['differential'] = df['trump'] - df['harris']
+    df = df.dropna(subset=['harris_combined', 'trump_combined'])
+    df['differential'] = df['harris_combined'] - df['trump_combined']
 
     if df.empty:
         st.warning("No data available for Differential Analysis.")
         return
 
     max_abs_diff = max(abs(df['differential'].min()), abs(df['differential'].max()))
-    y_range = max_abs_diff + 1
+    max_moe = max(df['harris_moe'].max(), df['trump_moe'].max())
+    y_range = max(max_abs_diff, max_moe) + 1
     y_min, y_max = -y_range, y_range
 
     base = alt.Chart(df).encode(
         x=alt.X('period:N', sort=PERIOD_ORDER, title='Period')
     )
 
-    bars = base.mark_bar(size=30).encode(
-        y=alt.Y('differential:Q',
-                title='Trump Advantage (+) vs Harris Advantage (-)',
-                scale=alt.Scale(domain=[y_min, y_max])),
+    bars = base.mark_bar(size=4).encode(
+        y=alt.Y(
+            'differential:Q',
+            title='Trump            Harris',
+            scale=alt.Scale(domain=[y_min, y_max])
+        ),
         color=alt.condition(
             alt.datum.differential > 0,
-            alt.value(TRUMP_COLOR),
-            alt.value(HARRIS_COLOR)
+            alt.value(HARRIS_COLOR),
+            alt.value(TRUMP_COLOR)
         ),
-        tooltip=[
-            alt.Tooltip('period:N', title='Period'),
-            alt.Tooltip('differential:Q', title='Differential', format='+.2f')
-        ]
+        tooltip=[alt.Tooltip('differential:Q', format='+.2f', title='Differential')]
     )
 
     zero_line = alt.Chart(pd.DataFrame({'y': [0]})).mark_rule(
-        color='black',
-        strokeWidth=2
+        color='#666',
+        strokeWidth=1,
+        strokeDash=[10, 5]
     ).encode(y='y')
 
-    final_chart = (bars + zero_line).properties(
-        title="Differential Between Trump and Harris Over Time",
+    text_labels = base.mark_text(
+        align='center',
+        baseline='middle',
+        dy=alt.ExprRef(expr='datum.differential > 0 ? -15 : 15'),
+        fontSize=12
+    ).encode(
+        y=alt.Y('differential:Q'),
+        text=alt.Text('differential:Q', format='+.2f'),
+        color=alt.condition(
+            alt.datum.differential > 0,
+            alt.value(HARRIS_COLOR),
+            alt.value(TRUMP_COLOR)
+        )
+    )
+
+    final_chart = alt.layer(
+        bars,
+        zero_line,
+        text_labels
+    ).properties(
+        title="Differential Between Harris and Trump Over Time",
         width=800,
         height=400
     )
@@ -150,8 +162,10 @@ def main():
     # Load and process data
     results_df = load_and_process_data()
 
+    # Display the available columns for debugging
+    # st.write("Available columns in results_df:", results_df.columns.tolist())
+
     if not results_df.empty:
-        # Filter out periods with insufficient data
         sufficient_data_df = results_df[results_df['message'].isnull()]
 
         if not sufficient_data_df.empty:
@@ -160,12 +174,16 @@ def main():
 
             st.header("Combined Analysis Over Time")
             create_line_chart(sufficient_data_df, [
-                'harris',
-                'trump',
-            ], "Combined Polling and Favorability Results Over Time")
+                'harris_polling',
+                'harris_fav',
+                'harris_combined',
+                'trump_polling',
+                'trump_fav',
+                'trump_combined'
+            ], "Combined Analysis Over Time")
 
             st.header("Polling Results Over Time")
-            create_line_chart(sufficient_data_df, ['harris', 'trump'], "Polling Results Over Time")
+            create_line_chart(sufficient_data_df, ['harris_polling', 'trump_polling'], "Polling Results Over Time")
 
             st.header("Favorability Over Time")
             if (
@@ -182,9 +200,10 @@ def main():
                 st.warning("No favorability data available.")
 
             st.header("Grouped Analysis")
-            y_columns = ['harris', 'trump']
+            y_columns = ['harris_polling', 'trump_polling']
             if 'harris_fav' in sufficient_data_df.columns and 'trump_fav' in sufficient_data_df.columns:
                 y_columns.extend(['harris_fav', 'trump_fav'])
+            y_columns.extend(['harris_combined', 'trump_combined'])
             create_line_chart(sufficient_data_df, y_columns, "Grouped Results Over Time")
 
             st.header("Analysis Results")

@@ -183,7 +183,7 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
     weighted_averages = (weighted_sums / total_weights).fillna(0)
 
     weighted_margins = {
-        candidate: calculate_timeframe_specific_moe(df, [candidate]) for candidate in candidate_names
+        candidate: calculate_timeframe_specific_moe(df[df['candidate_name'] == candidate], [candidate]) for candidate in candidate_names
     }
 
     return {
@@ -313,7 +313,13 @@ def get_analysis_results() -> pd.DataFrame:
     """
     polling_df, favorability_df = load_and_preprocess_data()
     results = calculate_results_for_all_periods(polling_df, favorability_df)
-    return pd.DataFrame(results)
+    results_df = pd.DataFrame(results)
+
+    # Ensure 'period' is a categorical variable with the specified order
+    results_df['period'] = pd.Categorical(results_df['period'], categories=config.PERIOD_ORDER, ordered=True)
+    results_df = results_df.sort_values('period')
+
+    return results_df
 
 def load_and_preprocess_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -384,44 +390,54 @@ def calculate_results_for_period(
     if filtered_polling_df.shape[0] < config.MIN_SAMPLES_REQUIRED:
         return {
             'period': f"{period_value} {period_type}",
-            'harris': None,
-            'trump': None,
+            'harris_polling': None,
+            'trump_polling': None,
             'harris_fav': None,
             'trump_fav': None,
+            'harris_combined': None,
+            'trump_combined': None,
             'harris_moe': None,
             'trump_moe': None,
             'oob_variance': None,
             'message': "Not enough polling data"
         }
 
+    # Calculate polling metrics
     polling_metrics = calculate_polling_metrics(filtered_polling_df, config.CANDIDATE_NAMES)
 
+    # Initialize variables
+    harris_fav = None
+    trump_fav = None
+    oob_variance = None
+    favorability_differential = {}
+
+    # Check if we have enough favorability data
     if filtered_favorability_df.shape[0] >= config.MIN_SAMPLES_REQUIRED:
         favorability_differential = calculate_favorability_differential(
             filtered_favorability_df, config.CANDIDATE_NAMES
         )
-        combined_results = combine_analysis(
-            polling_metrics, favorability_differential, config.FAVORABILITY_WEIGHT
-        )
-        oob_variance = calculate_oob_variance(filtered_favorability_df)
         harris_fav = favorability_differential.get('Kamala Harris', None)
         trump_fav = favorability_differential.get('Donald Trump', None)
+        oob_variance = calculate_oob_variance(filtered_favorability_df)
     else:
-        combined_results = combine_analysis(
-            polling_metrics, {}, 0.0  # Set favorability_weight to 0.0
-        )
-        oob_variance = None
         harris_fav = None
         trump_fav = None
 
+    # Combine polling metrics and favorability
+    combined_results = combine_analysis(
+        polling_metrics, favorability_differential, config.FAVORABILITY_WEIGHT
+    )
+
     return {
         'period': f"{period_value} {period_type}",
-        'harris': combined_results['Kamala Harris'][0],
-        'trump': combined_results['Donald Trump'][0],
+        'harris_polling': polling_metrics['Kamala Harris'][0],
+        'trump_polling': polling_metrics['Donald Trump'][0],
         'harris_fav': harris_fav,
         'trump_fav': trump_fav,
-        'harris_moe': combined_results['Kamala Harris'][1],
-        'trump_moe': combined_results['Donald Trump'][1],
+        'harris_combined': combined_results['Kamala Harris'][0],
+        'trump_combined': combined_results['Donald Trump'][0],
+        'harris_moe': polling_metrics['Kamala Harris'][1],
+        'trump_moe': polling_metrics['Donald Trump'][1],
         'oob_variance': oob_variance,
         'message': None
     }
@@ -431,8 +447,8 @@ def output_results(row: Dict[str, Any]):
     Outputs the results for a period to the console.
     """
     period = row['period']
-    harris_score = row['harris']
-    trump_score = row['trump']
+    harris_score = row['harris_combined']
+    trump_score = row['trump_combined']
     harris_margin = row['harris_moe']
     trump_margin = row['trump_moe']
     oob_variance = row['oob_variance']
