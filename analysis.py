@@ -4,13 +4,14 @@ import pandas as pd
 import numpy as np
 import requests
 from io import StringIO
-from typing import Dict, List, Tuple, Any, Optional, Callable, Union
 import logging
+from datetime import datetime
+from typing import Dict, List, Tuple, Any, Optional, Callable, Union
+from scipy.stats import norm
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer
-from scipy.stats import norm
 
 import config
 from states import get_state_data
@@ -39,11 +40,10 @@ def download_csv_data(url: str) -> pd.DataFrame:
 
 def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = None) -> pd.DataFrame:
     """
-    Preprocess the data by converting date columns, handling missing values,
-    and calculating necessary weights.
+    Preprocess the data by converting date columns, handling missing values, and calculating necessary weights.
     """
     df = df.copy()
-    # Let pandas infer the date format and set UTC timezone
+    # Parse 'created_at' column
     df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce', utc=True)
     df = df.dropna(subset=['created_at'])
     if start_period is not None:
@@ -51,9 +51,37 @@ def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = Non
 
     # Standardize candidate names
     if 'candidate_name' in df.columns:
-        df['candidate_name'] = df['candidate_name'].str.strip().str.replace(r'\s+[A-Z]\.', '', regex=True)
+        df['candidate_name'] = df['candidate_name'].str.strip()
     if 'politician' in df.columns:
-        df['politician'] = df['politician'].str.strip().str.replace(r'\s+[A-Z]\.', '', regex=True)
+        df['politician'] = df['politician'].str.strip()
+
+    # Normalize 'numeric_grade'
+    df['numeric_grade'] = pd.to_numeric(df['numeric_grade'], errors='coerce').fillna(0)
+    max_numeric_grade = df['numeric_grade'].max()
+    if max_numeric_grade != 0:
+        df['normalized_numeric_grade'] = df['numeric_grade'] / max_numeric_grade
+    else:
+        df['normalized_numeric_grade'] = 1.0
+    df['normalized_numeric_grade'] = df['normalized_numeric_grade'].clip(0, 1)
+
+    # Invert and normalize 'pollscore'
+    df['pollscore'] = pd.to_numeric(df['pollscore'], errors='coerce').fillna(0)
+    min_pollscore = df['pollscore'].min()
+    max_pollscore = df['pollscore'].max()
+    if max_pollscore - min_pollscore != 0:
+        df['normalized_pollscore'] = 1 - (df['pollscore'] - min_pollscore) / (max_pollscore - min_pollscore)
+    else:
+        df['normalized_pollscore'] = 1.0
+    df['normalized_pollscore'] = df['normalized_pollscore'].clip(0, 1)
+
+    # Normalize 'transparency_score'
+    df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
+    max_transparency_score = df['transparency_score'].max()
+    if max_transparency_score != 0:
+        df['normalized_transparency_score'] = df['transparency_score'] / max_transparency_score
+    else:
+        df['normalized_transparency_score'] = 1.0
+    df['normalized_transparency_score'] = df['normalized_transparency_score'].clip(0, 1)
 
     # Handle sample_size_weight
     min_sample_size = df['sample_size'].min()
@@ -78,6 +106,9 @@ def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = Non
     # Calculate state_rank using get_state_data()
     state_data = get_state_data()
     df['state_rank'] = df['state'].apply(lambda x: state_data.get(x, 1.0))
+
+    # Apply time decay weight
+    df = apply_time_decay_weight(df, config.DECAY_RATE, config.HALF_LIFE_DAYS)
 
     return df
 
@@ -132,6 +163,9 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
     list_weights = np.array([
         df['time_decay_weight'],
         df['sample_size_weight'],
+        df['normalized_numeric_grade'],
+        df['normalized_pollscore'],
+        df['normalized_transparency_score'],
         df['population_weight'],
         df['partisan_weight'],
         df['state_rank'],
@@ -164,18 +198,39 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
     # Ensure 'favorable' is correctly interpreted as a percentage
     df['favorable'] = df['favorable'].apply(lambda x: x if x > 1 else x * 100)
 
-    # Handle sample_size_weight
-    min_sample_size = df['sample_size'].min()
-    max_sample_size = df['sample_size'].max()
-    if max_sample_size - min_sample_size > 0:
-        df['sample_size_weight'] = (df['sample_size'] - min_sample_size) / (max_sample_size - min_sample_size)
+    # Normalize 'numeric_grade'
+    df['numeric_grade'] = pd.to_numeric(df['numeric_grade'], errors='coerce').fillna(0)
+    max_numeric_grade = df['numeric_grade'].max()
+    if max_numeric_grade != 0:
+        df['normalized_numeric_grade'] = df['numeric_grade'] / max_numeric_grade
     else:
-        df['sample_size_weight'] = 1.0
+        df['normalized_numeric_grade'] = 1.0
+    df['normalized_numeric_grade'] = df['normalized_numeric_grade'].clip(0, 1)
 
-    # Combined weight
+    # Invert and normalize 'pollscore'
+    df['pollscore'] = pd.to_numeric(df['pollscore'], errors='coerce').fillna(0)
+    min_pollscore = df['pollscore'].min()
+    max_pollscore = df['pollscore'].max()
+    if max_pollscore - min_pollscore != 0:
+        df['normalized_pollscore'] = 1 - (df['pollscore'] - min_pollscore) / (max_pollscore - min_pollscore)
+    else:
+        df['normalized_pollscore'] = 1.0
+    df['normalized_pollscore'] = df['normalized_pollscore'].clip(0, 1)
+
+    # Normalize 'transparency_score'
+    df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
+    max_transparency_score = df['transparency_score'].max()
+    if max_transparency_score != 0:
+        df['normalized_transparency_score'] = df['transparency_score'] / max_transparency_score
+    else:
+        df['normalized_transparency_score'] = 1.0
+    df['normalized_transparency_score'] = df['normalized_transparency_score'].clip(0, 1)
+
+    # Prepare weights
     list_weights = np.array([
-        df['sample_size_weight'],
-        df['time_decay_weight']
+        df['normalized_numeric_grade'],
+        df['normalized_pollscore'],
+        df['normalized_transparency_score']
     ])
     df['combined_weight'] = np.prod(list_weights, axis=0)
 
@@ -212,6 +267,9 @@ def calculate_oob_variance(df: pd.DataFrame) -> float:
         return 0.0  # Return 0 variance if DataFrame is empty
 
     features_columns = [
+        'normalized_numeric_grade',
+        'normalized_pollscore',
+        'normalized_transparency_score',
         'sample_size_weight',
         'population_weight',
         'partisan_weight',
@@ -264,15 +322,11 @@ def load_and_preprocess_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     polling_df = download_csv_data(config.POLLING_URL)
     favorability_df = download_csv_data(config.FAVORABILITY_URL)
 
-    # Debug statements to verify data loading
     logging.info(f"Polling data loaded with {polling_df.shape[0]} rows.")
     logging.info(f"Favorability data loaded with {favorability_df.shape[0]} rows.")
 
     polling_df = preprocess_data(polling_df)
     favorability_df = preprocess_data(favorability_df)
-
-    polling_df = apply_time_decay_weight(polling_df, config.DECAY_RATE, config.HALF_LIFE_DAYS)
-    favorability_df = apply_time_decay_weight(favorability_df, config.DECAY_RATE, config.HALF_LIFE_DAYS)
 
     return polling_df, favorability_df
 
