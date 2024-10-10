@@ -1,20 +1,19 @@
 # analysis.py
 
-from states import get_state_data
 import pandas as pd
 import numpy as np
 import requests
-from io import StringIO
+import config
 import logging
+from states import get_state_data
+from config import *
+from io import StringIO
 from typing import Dict, List, Tuple, Any, Optional, Callable, Union
 from scipy.stats import norm
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer
-
-import config
-from config import *
 
 # Configure logging
 logging.basicConfig(level=config.LOGGING_LEVEL, format=config.LOGGING_FORMAT)
@@ -62,7 +61,7 @@ def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = Non
     if max_numeric_grade != 0:
         df['normalized_numeric_grade'] = df['numeric_grade'] / max_numeric_grade
     else:
-        df['normalized_numeric_grade'] = ZERO_CORRECTION
+        df['normalized_numeric_grade'] = config.ZERO_CORRECTION
     df['normalized_numeric_grade'] = df['normalized_numeric_grade'].clip(0, 1)
 
     # Invert and normalize 'pollscore'
@@ -72,7 +71,7 @@ def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = Non
     if max_pollscore - min_pollscore != 0:
         df['normalized_pollscore'] = 1 - (df['pollscore'] - min_pollscore) / (max_pollscore - min_pollscore)
     else:
-        df['normalized_pollscore'] = ZERO_CORRECTION
+        df['normalized_pollscore'] = config.ZERO_CORRECTION
     df['normalized_pollscore'] = df['normalized_pollscore'].clip(0, 1)
 
     # Normalize 'transparency_score'
@@ -81,7 +80,7 @@ def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = Non
     if max_transparency_score != 0:
         df['normalized_transparency_score'] = df['transparency_score'] / max_transparency_score
     else:
-        df['normalized_transparency_score'] = ZERO_CORRECTION
+        df['normalized_transparency_score'] = config.ZERO_CORRECTION
     df['normalized_transparency_score'] = df['normalized_transparency_score'].clip(0, 1)
 
     # Handle sample_size_weight
@@ -160,16 +159,16 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
     # Ensure 'pct' is correctly interpreted as a percentage
     df['pct'] = df['pct'].apply(lambda x: x if x > 1 else x * 100)
 
-    # Prepare the weights
+    # Prepare the weights with multipliers
     list_weights = np.array([
-        df['time_decay_weight'],
-        df['sample_size_weight'],
-        df['normalized_numeric_grade'],
-        df['normalized_pollscore'],
-        df['normalized_transparency_score'],
-        df['population_weight'],
-        df['partisan_weight'],
-        df['state_rank'],
+        df['time_decay_weight'] * config.TIME_DECAY_WEIGHT_MULTIPLIER,
+        df['sample_size_weight'] * config.SAMPLE_SIZE_WEIGHT_MULTIPLIER,
+        df['normalized_numeric_grade'] * config.NORMALIZED_NUMERIC_GRADE_MULTIPLIER,
+        df['normalized_pollscore'] * config.NORMALIZED_POLLSCORE_MULTIPLIER,
+        df['normalized_transparency_score'] * config.NORMALIZED_TRANSPARENCY_SCORE_MULTIPLIER,
+        df['population_weight'] * config.POPULATION_WEIGHT_MULTIPLIER,
+        df['partisan_weight'] * config.PARTISAN_WEIGHT_MULTIPLIER,
+        df['state_rank'] * config.STATE_RANK_MULTIPLIER,
     ])
     if config.HEAVY_WEIGHT:
         df['combined_weight'] = np.prod(list_weights, axis=0)
@@ -205,7 +204,7 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
     if max_numeric_grade != 0:
         df['normalized_numeric_grade'] = df['numeric_grade'] / max_numeric_grade
     else:
-        df['normalized_numeric_grade'] = ZERO_CORRECTION
+        df['normalized_numeric_grade'] = config.ZERO_CORRECTION
     df['normalized_numeric_grade'] = df['normalized_numeric_grade'].clip(0, 1)
 
     # Invert and normalize 'pollscore'
@@ -215,7 +214,7 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
     if max_pollscore - min_pollscore != 0:
         df['normalized_pollscore'] = 1 - (df['pollscore'] - min_pollscore) / (max_pollscore - min_pollscore)
     else:
-        df['normalized_pollscore'] = ZERO_CORRECTION
+        df['normalized_pollscore'] = config.ZERO_CORRECTION
     df['normalized_pollscore'] = df['normalized_pollscore'].clip(0, 1)
 
     # Normalize 'transparency_score'
@@ -224,16 +223,20 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
     if max_transparency_score != 0:
         df['normalized_transparency_score'] = df['transparency_score'] / max_transparency_score
     else:
-        df['normalized_transparency_score'] = ZERO_CORRECTION
+        df['normalized_transparency_score'] = config.ZERO_CORRECTION
     df['normalized_transparency_score'] = df['normalized_transparency_score'].clip(0, 1)
 
-    # Prepare weights
+    # Prepare weights with multipliers
     list_weights = np.array([
-        df['normalized_numeric_grade'],
-        df['normalized_pollscore'],
-        df['normalized_transparency_score']
+        df['normalized_numeric_grade'] * config.NORMALIZED_NUMERIC_GRADE_MULTIPLIER,
+        df['normalized_pollscore'] * config.NORMALIZED_POLLSCORE_MULTIPLIER,
+        df['normalized_transparency_score'] * config.NORMALIZED_TRANSPARENCY_SCORE_MULTIPLIER
     ])
-    df['combined_weight'] = np.prod(list_weights, axis=0)
+
+    if config.HEAVY_WEIGHT:
+        df['combined_weight'] = np.prod(list_weights, axis=0)
+    else:
+        df['combined_weight'] = np.mean(list_weights, axis=0)
 
     weighted_sums = df.groupby('politician')['combined_weight'].apply(
         lambda x: (x * df.loc[x.index, 'favorable']).sum()
@@ -345,7 +348,7 @@ def calculate_results_for_all_periods(
     Calculates results for all predefined periods.
     """
     results = []
-    periods = [(int(period.split()[0]), period.split()[1]) for period in PERIOD_ORDER]
+    periods = [(int(period.split()[0]), period.split()[1]) for period in config.PERIOD_ORDER]
 
     for period_value, period_type in periods:
         period_result = calculate_results_for_period(
