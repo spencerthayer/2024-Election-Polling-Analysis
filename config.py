@@ -5,6 +5,15 @@ import logging
 # Candidate names to be analyzed
 CANDIDATE_NAMES = ['Kamala Harris', 'Donald Trump']
 
+TIME_DECAY_WEIGHT = 1.0 # Weight for time decay in the combined analysis
+SAMPLE_SIZE_WEIGHT = 1.0 # Weight for sample size in the combined analysis
+NORMALIZED_NUMERIC_GRADE = 1.0 # Normalized numeric grade for the pollster
+NORMALIZED_POLLSCORE = 1.0 # Normalized poll score for the pollster
+NORMALIZED_TRANSPARENCY_SCORE = 1.0 # Normalized transparency score for the pollster
+POPULATION_WEIGHT = 1.0 # Population weight for the pollster
+PARTISAN_WEIGHT = 1.0 # Partisan weight for the pollster
+STATE_RANK = 1.0 # State rank for the pollster
+
 # Weight given to favorability in the combined analysis (between 0 and 1)
 FAVORABILITY_WEIGHT = 0.25  # Adjust this value between 0 (no favorability influence) and 1 (only favorability)
 
