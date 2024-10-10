@@ -424,7 +424,7 @@ def main():
         for key, value in new_config.items():
             if key != "FORCE_REFRESH":
                 setattr(config, key, value)
-        st.success("Configuration updated. Reprocessing data...")
+        st.success("Configuration updated. Reprocessing data, this might take a while...")
         force_refresh = new_config.get("FORCE_REFRESH", False)
         if force_refresh:
             st.info("Forcing data refresh...")
