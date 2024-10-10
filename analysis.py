@@ -1,5 +1,6 @@
 # analysis.py
 
+from states import get_state_data
 import pandas as pd
 import numpy as np
 import requests
@@ -14,7 +15,6 @@ from sklearn.preprocessing import FunctionTransformer
 
 import config
 from config import *
-from states import get_state_data
 
 # Configure logging
 logging.basicConfig(level=config.LOGGING_LEVEL, format=config.LOGGING_FORMAT)
@@ -62,7 +62,7 @@ def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = Non
     if max_numeric_grade != 0:
         df['normalized_numeric_grade'] = df['numeric_grade'] / max_numeric_grade
     else:
-        df['normalized_numeric_grade'] = 1.0
+        df['normalized_numeric_grade'] = ZERO_CORRECTION
     df['normalized_numeric_grade'] = df['normalized_numeric_grade'].clip(0, 1)
 
     # Invert and normalize 'pollscore'
@@ -72,7 +72,7 @@ def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = Non
     if max_pollscore - min_pollscore != 0:
         df['normalized_pollscore'] = 1 - (df['pollscore'] - min_pollscore) / (max_pollscore - min_pollscore)
     else:
-        df['normalized_pollscore'] = 1.0
+        df['normalized_pollscore'] = ZERO_CORRECTION
     df['normalized_pollscore'] = df['normalized_pollscore'].clip(0, 1)
 
     # Normalize 'transparency_score'
@@ -81,7 +81,7 @@ def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = Non
     if max_transparency_score != 0:
         df['normalized_transparency_score'] = df['transparency_score'] / max_transparency_score
     else:
-        df['normalized_transparency_score'] = 1.0
+        df['normalized_transparency_score'] = ZERO_CORRECTION
     df['normalized_transparency_score'] = df['normalized_transparency_score'].clip(0, 1)
 
     # Handle sample_size_weight
@@ -205,7 +205,7 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
     if max_numeric_grade != 0:
         df['normalized_numeric_grade'] = df['numeric_grade'] / max_numeric_grade
     else:
-        df['normalized_numeric_grade'] = 1.0
+        df['normalized_numeric_grade'] = ZERO_CORRECTION
     df['normalized_numeric_grade'] = df['normalized_numeric_grade'].clip(0, 1)
 
     # Invert and normalize 'pollscore'
@@ -215,7 +215,7 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
     if max_pollscore - min_pollscore != 0:
         df['normalized_pollscore'] = 1 - (df['pollscore'] - min_pollscore) / (max_pollscore - min_pollscore)
     else:
-        df['normalized_pollscore'] = 1.0
+        df['normalized_pollscore'] = ZERO_CORRECTION
     df['normalized_pollscore'] = df['normalized_pollscore'].clip(0, 1)
 
     # Normalize 'transparency_score'
@@ -224,7 +224,7 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
     if max_transparency_score != 0:
         df['normalized_transparency_score'] = df['transparency_score'] / max_transparency_score
     else:
-        df['normalized_transparency_score'] = 1.0
+        df['normalized_transparency_score'] = ZERO_CORRECTION
     df['normalized_transparency_score'] = df['normalized_transparency_score'].clip(0, 1)
 
     # Prepare weights

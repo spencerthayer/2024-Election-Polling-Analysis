@@ -18,15 +18,23 @@ HARRIS_COLOR_LIGHT = config.HARRIS_COLOR_LIGHT
 PERIOD_ORDER = config.PERIOD_ORDER
 CANDIDATE_NAMES = config.CANDIDATE_NAMES
 
+# Update the load_and_process_data function to use st.cache_data and accept config_vars
 @st.cache_data
-def load_and_process_data() -> pd.DataFrame:
+def load_and_process_data(config_vars) -> pd.DataFrame:
     """
-    Loads and processes data using the analysis module.
+    Loads and processes data using the analysis module with user-defined configuration.
+
+    Args:
+        config_vars (dict): Dictionary containing user-defined configuration variables.
 
     Returns:
         pd.DataFrame: DataFrame containing analysis results.
     """
     try:
+        # Update config with user-defined values
+        for key, value in config_vars.items():
+            setattr(config, key, value)
+        
         results_df = get_analysis_results()
         return results_df
     except Exception as e:
@@ -183,6 +191,121 @@ def create_differential_bar_chart(df: pd.DataFrame):
 
     st.altair_chart(final_chart, use_container_width=True)
 
+def configuration_form():
+    with st.sidebar:
+        st.header("Polling Configuration")
+        st.html("<sup>Adjust the configuration weights for the polling analysis.</sup>")
+        with st.form("config_form"):
+            favorability_weight = st.slider("Favorability Weight", 0.0, 1.0, float(FAVORABILITY_WEIGHT), 0.01)
+            # favorability_weight = st.number_input(
+            #     "Favorability Weight", 
+            #     min_value=0.000, 
+            #     max_value=1.000, 
+            #     value=float(FAVORABILITY_WEIGHT), 
+            #     step=0.001,
+            #     format="%.3f"
+            # )
+            heavy_weight = st.checkbox("Heavy Weight", HEAVY_WEIGHT)
+            st.html("<sup>Check for multiplicative, uncheck for additive.</sup>")
+            
+            st.subheader("Time Weight")
+            half_life_days = st.number_input("Half Life in Days", 1, 365, int(HALF_LIFE_DAYS), 1)
+            st.html("<sup>Time decay parameter that controls the inlfuence of older polls.</sup>")
+            decay_rate = st.number_input(
+                "Decay Rate", 
+                min_value=0.001, 
+                max_value=10.000, 
+                value=float(DECAY_RATE), 
+                step=0.001,
+                format="%.3f"
+            )
+            st.html("<sup>The rate at which older polls lose influence.</sup>")
+            min_samples_required = st.number_input("Minimum Samples Required", 1, 100, int(MIN_SAMPLES_REQUIRED), 1)
+            st.html("<sup>The minimum number of samples required to perform analysis for a period.</sup>")
+            
+            st.subheader("Partisan Polling Weight")
+            partisan_weight_true = st.number_input(
+                "Partisan Polls Weight", 
+                min_value=0.000, 
+                max_value=1.000, 
+                value=float(PARTISAN_WEIGHT[True]), 
+                step=0.001,
+                format="%.3f"
+            )
+            partisan_weight_false = st.number_input(
+                "Non-Partisan Polls Weight", 
+                min_value=0.000, 
+                max_value=1.000, 
+                value=float(PARTISAN_WEIGHT[False]), 
+                step=0.001,
+                format="%.3f"
+            )
+            
+            st.subheader("Voter Weights")
+            lv_weight = st.number_input(
+                "Likely Voters", 
+                min_value=0.000, 
+                max_value=1.000, 
+                value=float(POPULATION_WEIGHTS['lv']), 
+                step=0.001,
+                format="%.3f"
+            )
+            rv_weight = st.number_input(
+                "Registered Voters", 
+                min_value=0.000, 
+                max_value=1.000, 
+                value=float(POPULATION_WEIGHTS['rv']), 
+                step=0.001,
+                format="%.3f"
+            )
+            v_weight = st.number_input(
+                "Past Vosters", 
+                min_value=0.000, 
+                max_value=1.000, 
+                value=float(POPULATION_WEIGHTS['v']), 
+                step=0.001,
+                format="%.3f"
+            )
+            a_weight = st.number_input(
+                "Eligible Voters", 
+                min_value=0.000, 
+                max_value=1.000, 
+                value=float(POPULATION_WEIGHTS['a']), 
+                step=0.001,
+                format="%.3f"
+            )
+            all_weight = st.number_input(
+                "Unlikely Voters",
+                min_value=0.000, 
+                max_value=1.000, 
+                value=float(POPULATION_WEIGHTS['all']), 
+                step=0.001,
+                format="%.3f"
+            )
+            
+            refresh_data = st.checkbox("Refresh Data", True)
+            
+            submitted = st.form_submit_button("Apply Changes and Run Analysis")
+    
+    if submitted:
+        return {
+            "FAVORABILITY_WEIGHT": favorability_weight,
+            "HEAVY_WEIGHT": heavy_weight,
+            "DECAY_RATE": decay_rate,
+            "HALF_LIFE_DAYS": half_life_days,
+            "MIN_SAMPLES_REQUIRED": min_samples_required,
+            "PARTISAN_WEIGHT": {True: partisan_weight_true, False: partisan_weight_false},
+            "POPULATION_WEIGHTS": {
+                'lv': lv_weight,
+                'rv': rv_weight,
+                'v': v_weight,
+                'a': a_weight,
+                'all': all_weight
+            },
+            "REFRESH_DATA": refresh_data
+        }
+    return None
+
 def main():
     """
     Main function to run the Streamlit app.
@@ -191,13 +314,28 @@ def main():
     st.set_page_config(page_title="Election Polling Analysis", layout="wide")
     st.title("Election Polling Analysis")
     
+    # Configuration form
+    config_vars = configuration_form()
     
+    if config_vars:
+        st.success("Configuration updated. Reprocessing data...")
+        if config_vars.pop("REFRESH_DATA", False):
+            st.info("Refreshing data from CSV URLs...")
+            # Clear the cache to force a refresh of the data
+            st.cache_data.clear()
+    else:
+        config_vars = {
+            "FAVORABILITY_WEIGHT": FAVORABILITY_WEIGHT,
+            "HEAVY_WEIGHT": HEAVY_WEIGHT,
+            "DECAY_RATE": DECAY_RATE,
+            "HALF_LIFE_DAYS": HALF_LIFE_DAYS,
+            "MIN_SAMPLES_REQUIRED": MIN_SAMPLES_REQUIRED,
+            "PARTISAN_WEIGHT": PARTISAN_WEIGHT,
+            "POPULATION_WEIGHTS": POPULATION_WEIGHTS
+        }
 
     # Load and process data
-    results_df = load_and_process_data()
-
-    # Display the available columns for debugging
-    # st.write("Available columns in results_df:", results_df.columns.tolist())
+    results_df = load_and_process_data(config_vars)
 
     if not results_df.empty:
         sufficient_data_df = results_df[results_df['message'].isnull()]
@@ -233,13 +371,6 @@ def main():
             else:
                 st.warning("No favorability data available.")
 
-            # st.header("Grouped Analysis")
-            # y_columns = ['harris_polling', 'trump_polling']
-            # if 'harris_fav' in sufficient_data_df.columns and 'trump_fav' in sufficient_data_df.columns:
-            #     y_columns.extend(['harris_fav', 'trump_fav'])
-            # y_columns.extend(['harris_combined', 'trump_combined'])
-            # create_line_chart(sufficient_data_df, y_columns, "Grouped Results Over Time")
-
             st.header("Analysis Results")
             st.write(sufficient_data_df)
         else:
@@ -254,7 +385,6 @@ def main():
     else:
         st.error("No data available.")
 
-
     # Add download links for CSV files
     st.header("Download Raw Data")
     st.markdown(f"[Download Polling Data CSV]({POLLING_URL})")
@@ -264,7 +394,5 @@ def main():
     st.markdown("---")
     st.write(f"Developed by Spencer Thayer. Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # Add this code at the bottom of your app.py file, just before the if __name__ == "__main__": line
-
 if __name__ == "__main__":
     main()

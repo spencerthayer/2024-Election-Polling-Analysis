@@ -16,7 +16,9 @@ DECAY_RATE = 1     # Decay rate for time decay weighting (e.g., 0.5 for a slow 5
 HALF_LIFE_DAYS = 14  # Half-life in days for time decay weighting
 
 # Minimum number of samples required for analysis
-MIN_SAMPLES_REQUIRED = 4 # Minimum number of data points required to perform analysis for a period
+MIN_SAMPLES_REQUIRED = 2 # Minimum number of data points required to perform analysis for a period
+
+ZERO_CORRECTION = 0.0001  # Small value to prevent division by zero in calculations
 
 # Random Forest parameters
 N_TREES = 1000       # Number of trees in the Random Forest
@@ -32,7 +34,7 @@ FAVORABILITY_URL = "https://projects.fivethirtyeight.com/polls-page/data/favorab
 
 # Partisan weight mapping
 PARTISAN_WEIGHT = {
-    True: 0.01,  # Apply a reduced weight to partisan polls
+    True: 0.001,  # Apply a reduced weight to partisan polls
     False: 1.0  # Apply full weight to non-partisan polls
 }
 
@@ -42,7 +44,7 @@ POPULATION_WEIGHTS = {
     'rv': 0.75,     # Registered voters
     'v': 0.5,       # Voters (general)
     'a': 0.25,      # Adults
-    'all': 0.25     # All respondents
+    'all': 0.1     # All respondents
 }
 
 # Coloring constants for visualizations
