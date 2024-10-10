@@ -56,17 +56,20 @@ def create_line_chart(df: pd.DataFrame, y_columns: list, title: str):
     y_min = df_melted['value'].min() - 0.5
     y_max = df_melted['value'].max() + 0.5
 
-    # Adjust color_scale based on candidate and data type
+    # Create a color mapping dictionary
+    color_mapping = {
+        'harris_polling': HARRIS_COLOR,
+        'harris_fav': HARRIS_COLOR_LIGHT,
+        'harris_combined': HARRIS_COLOR_DARK,
+        'trump_polling': TRUMP_COLOR,
+        'trump_fav': TRUMP_COLOR_LIGHT,
+        'trump_combined': TRUMP_COLOR_DARK
+    }
+
+    # Create the color scale using the mapping
     color_scale = alt.Scale(
         domain=y_columns,
-        range=[
-            HARRIS_COLOR,            # harris_polling
-            HARRIS_COLOR_LIGHT,      # harris_fav
-            HARRIS_COLOR_DARK,       # harris_combined
-            TRUMP_COLOR,             # trump_polling
-            TRUMP_COLOR_LIGHT,       # trump_fav
-            TRUMP_COLOR_DARK         # trump_combined
-        ][:len(y_columns)]  # Ensure the range matches the number of y_columns
+        range=[color_mapping[col] for col in y_columns]
     )
 
     chart = alt.Chart(df_melted).mark_line(point=True).encode(
@@ -227,12 +230,12 @@ def main():
             else:
                 st.warning("No favorability data available.")
 
-            st.header("Grouped Analysis")
-            y_columns = ['harris_polling', 'trump_polling']
-            if 'harris_fav' in sufficient_data_df.columns and 'trump_fav' in sufficient_data_df.columns:
-                y_columns.extend(['harris_fav', 'trump_fav'])
-            y_columns.extend(['harris_combined', 'trump_combined'])
-            create_line_chart(sufficient_data_df, y_columns, "Grouped Results Over Time")
+            # st.header("Grouped Analysis")
+            # y_columns = ['harris_polling', 'trump_polling']
+            # if 'harris_fav' in sufficient_data_df.columns and 'trump_fav' in sufficient_data_df.columns:
+            #     y_columns.extend(['harris_fav', 'trump_fav'])
+            # y_columns.extend(['harris_combined', 'trump_combined'])
+            # create_line_chart(sufficient_data_df, y_columns, "Grouped Results Over Time")
 
             st.header("Analysis Results")
             st.write(sufficient_data_df)
