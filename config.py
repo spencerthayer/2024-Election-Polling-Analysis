@@ -12,7 +12,7 @@ FAVORABILITY_WEIGHT = 0.25  # Adjust this value between 0 (no favorability influ
 HEAVY_WEIGHT = True  # Set to True to use multiplicative weighting, False for additive weighting
 
 # Time decay parameters
-DECAY_RATE = 0.5     # Decay rate for time decay weighting (e.g., 0.5 for 50% decay)
+DECAY_RATE = 1     # Decay rate for time decay weighting (e.g., 0.5 for a slow 50% decay use 2 for a faster 200% decay)
 HALF_LIFE_DAYS = 14  # Half-life in days for time decay weighting
 
 # Minimum number of samples required for analysis

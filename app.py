@@ -106,8 +106,8 @@ def create_differential_bar_chart(df: pd.DataFrame):
 
     bars = base.mark_bar(size=4).encode(
         y=alt.Y(
-            'differential:Q',
-            title='Trump            Harris',
+            'differential:Q', 
+            title='Trump            Harris', 
             scale=alt.Scale(domain=[y_min, y_max])
         ),
         color=alt.condition(
@@ -115,11 +115,37 @@ def create_differential_bar_chart(df: pd.DataFrame):
             alt.value(HARRIS_COLOR),
             alt.value(TRUMP_COLOR)
         ),
-        tooltip=[alt.Tooltip('differential:Q', format='+.2f', title='Differential')]
+        tooltip=[
+            alt.Tooltip('differential:Q', format='+.2f', title='Differential'),
+            alt.Tooltip('harris_combined:Q', format='.2f', title='Harris'),
+            alt.Tooltip('trump_combined:Q', format='.2f', title='Trump')
+        ]
+    )
+
+    trump_moe_area = base.mark_area(
+        opacity=0.25,
+        color=TRUMP_COLOR_LIGHT
+    ).encode(
+        y=alt.Y('zero:Q'),
+        y2=alt.Y2('low:Q')
+    ).transform_calculate(
+        zero='datum.trump_moe*((100-(datum.differential*10))*.01)*1',
+        low='datum.trump_moe*-1'
+    )
+
+    harris_moe_area = base.mark_area(
+        opacity=0.25,
+        color=HARRIS_COLOR_LIGHT
+    ).encode(
+        y=alt.Y('zero:Q'),
+        y2=alt.Y2('high:Q')
+    ).transform_calculate(
+        zero='datum.harris_moe*((100-(datum.differential*10))*.01)*-1',
+        high='datum.harris_moe'
     )
 
     zero_line = alt.Chart(pd.DataFrame({'y': [0]})).mark_rule(
-        color='#666',
+        color='#666', 
         strokeWidth=1,
         strokeDash=[10, 5]
     ).encode(y='y')
@@ -127,8 +153,8 @@ def create_differential_bar_chart(df: pd.DataFrame):
     text_labels = base.mark_text(
         align='center',
         baseline='middle',
-        dy=alt.ExprRef(expr='datum.differential > 0 ? -15 : 15'),
-        fontSize=12
+        dy=alt.expr('datum.differential > 0 ? -15 : 15'),
+        fontSize=20
     ).encode(
         y=alt.Y('differential:Q'),
         text=alt.Text('differential:Q', format='+.2f'),
@@ -140,6 +166,8 @@ def create_differential_bar_chart(df: pd.DataFrame):
     )
 
     final_chart = alt.layer(
+        trump_moe_area,
+        harris_moe_area,
         bars,
         zero_line,
         text_labels
