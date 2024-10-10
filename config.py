@@ -57,12 +57,17 @@ HARRIS_COLOR_LIGHT = "#6495ED"
 PERIOD_ORDER = [
     '12 months',
     '6 months',
+    '5 months',
+    '4 months',
     '3 months',
+    '2 months',
     '1 months',
     '21 days',
     '14 days',
     '7 days',
+    '5 days',
     '3 days',
+    '2 days',
     '1 days'
 ]
 

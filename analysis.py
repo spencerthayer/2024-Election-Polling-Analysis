@@ -13,6 +13,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer
 
 import config
+from config import *
 from states import get_state_data
 
 # Configure logging
@@ -344,10 +345,7 @@ def calculate_results_for_all_periods(
     Calculates results for all predefined periods.
     """
     results = []
-    periods = [
-        (12, 'months'), (6, 'months'), (3, 'months'), (1, 'months'),
-        (21, 'days'), (14, 'days'), (7, 'days'), (3, 'days'), (1, 'days')
-    ]
+    periods = [(int(period.split()[0]), period.split()[1]) for period in PERIOD_ORDER]
 
     for period_value, period_type in periods:
         period_result = calculate_results_for_period(
