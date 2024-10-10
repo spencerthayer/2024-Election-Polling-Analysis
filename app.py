@@ -1,5 +1,7 @@
 # app.py
 
+import os
+import json
 import streamlit as st
 import pandas as pd
 import altair as alt
@@ -17,26 +19,112 @@ HARRIS_COLOR = config.HARRIS_COLOR
 HARRIS_COLOR_LIGHT = config.HARRIS_COLOR_LIGHT
 PERIOD_ORDER = config.PERIOD_ORDER
 CANDIDATE_NAMES = config.CANDIDATE_NAMES
+POLLING_URL = config.POLLING_URL
+FAVORABILITY_URL = config.FAVORABILITY_URL
 
-# Update the load_and_process_data function to use st.cache_data and accept config_vars
+# Constants for caching
+DATA_DIR = "data"
+CACHED_DATA_FILE = os.path.join(DATA_DIR, "sufficient_data.csv")
+CACHED_CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
+CACHED_RESULTS_FILE = os.path.join(DATA_DIR, "results_df.csv")
+
+def ensure_data_dir():
+    """Ensure the data directory exists."""
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+
+def load_cached_data():
+    """Load cached sufficient_data_df if it exists."""
+    if os.path.exists(CACHED_DATA_FILE):
+        try:
+            df = pd.read_csv(CACHED_DATA_FILE)
+            return df
+        except Exception as e:
+            st.error(f"Error loading cached data: {e}")
+    return None
+
+def save_cached_data(df):
+    """Save sufficient_data_df to cache."""
+    ensure_data_dir()
+    try:
+        df.to_csv(CACHED_DATA_FILE, index=False)
+    except Exception as e:
+        st.error(f"Error saving cached data: {e}")
+
+def load_cached_results_df():
+    """Load cached results_df if it exists."""
+    if os.path.exists(CACHED_RESULTS_FILE):
+        try:
+            df = pd.read_csv(CACHED_RESULTS_FILE)
+            return df
+        except Exception as e:
+            st.error(f"Error loading cached results: {e}")
+    return None
+
+def save_cached_results_df(df):
+    """Save results_df to cache."""
+    ensure_data_dir()
+    try:
+        df.to_csv(CACHED_RESULTS_FILE, index=False)
+    except Exception as e:
+        st.error(f"Error saving cached results: {e}")
+
+def load_cached_config():
+    """Load cached configuration if it exists."""
+    if os.path.exists(CACHED_CONFIG_FILE):
+        try:
+            with open(CACHED_CONFIG_FILE, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            st.error(f"Error loading cached configuration: {e}")
+    return None
+
+def save_cached_config(config_dict):
+    """Save configuration to cache."""
+    ensure_data_dir()
+    try:
+        with open(CACHED_CONFIG_FILE, 'w') as f:
+            json.dump(config_dict, f)
+    except Exception as e:
+        st.error(f"Error saving cached configuration: {e}")
+
+# Update the load_and_process_data function to use caching
 @st.cache_data
-def load_and_process_data(config_vars) -> pd.DataFrame:
+def load_and_process_data(config_vars, force_refresh=False):
     """
     Loads and processes data using the analysis module with user-defined configuration.
+    Utilizes caching to improve performance on subsequent runs.
 
     Args:
         config_vars (dict): Dictionary containing user-defined configuration variables.
+        force_refresh (bool): If True, forces data to be reprocessed even if cached data exists.
 
     Returns:
-        pd.DataFrame: DataFrame containing analysis results.
+        tuple: (sufficient_data_df, results_df)
     """
+    cached_data = load_cached_data()
+    cached_results = load_cached_results_df()
+    cached_config = load_cached_config()
+
+    if not force_refresh and cached_data is not None and cached_config == config_vars:
+        st.info("Using cached data.")
+        sufficient_data_df = cached_data
+        results_df = cached_results
+        return sufficient_data_df, results_df
+
     try:
         # Update config with user-defined values
         for key, value in config_vars.items():
             setattr(config, key, value)
         
         results_df = get_analysis_results()
-        return results_df
+        sufficient_data_df = results_df[results_df['message'].isnull()]
+        
+        save_cached_data(sufficient_data_df)
+        save_cached_results_df(results_df)
+        save_cached_config(config_vars)
+        
+        return sufficient_data_df, results_df
     except Exception as e:
         st.error(f"An error occurred while processing data: {e}")
         st.stop()
@@ -197,15 +285,15 @@ def create_differential_bar_chart(df: pd.DataFrame):
 def configuration_form():
     with st.sidebar:
         st.header("Polling Configuration")
-        st.html("<sup>Adjust the configuration weights for the polling analysis.</sup>")
+        st.markdown("<sup>Adjust the configuration weights for the polling analysis.</sup>", unsafe_allow_html=True)
         with st.form("config_form"):
             favorability_weight = st.slider("Favorability Weight", 0.0, 1.0, float(config.FAVORABILITY_WEIGHT), 0.01)
             heavy_weight = st.checkbox("Heavy Weight", config.HEAVY_WEIGHT)
-            st.html("<sup>Check for multiplicative, uncheck for additive.</sup>")
+            st.markdown("<sup>Check for multiplicative, uncheck for additive.</sup>", unsafe_allow_html=True)
             
             st.subheader("Time Weight")
             half_life_days = st.number_input("Half Life in Days", 1, 365, int(config.HALF_LIFE_DAYS), 1)
-            st.html("<sup>Time decay parameter that controls the influence of older polls.</sup>")
+            st.markdown("<sup>Time decay parameter that controls the influence of older polls.</sup>", unsafe_allow_html=True)
             decay_rate = st.number_input(
                 "Decay Rate", 
                 min_value=0.001, 
@@ -214,9 +302,9 @@ def configuration_form():
                 step=0.001,
                 format="%.3f"
             )
-            st.html("<sup>The rate at which older polls lose influence.</sup>")
+            st.markdown("<sup>The rate at which older polls lose influence.</sup>", unsafe_allow_html=True)
             min_samples_required = st.number_input("Minimum Samples Required", 1, 100, int(config.MIN_SAMPLES_REQUIRED), 1)
-            st.html("<sup>The minimum number of samples required to perform analysis for a period.</sup>")
+            st.markdown("<sup>The minimum number of samples required to perform analysis for a period.</sup>", unsafe_allow_html=True)
             
             st.subheader("Partisan Polling Weight")
             partisan_weight_true = st.number_input(
@@ -288,7 +376,7 @@ def configuration_form():
             partisan_weight_multiplier = st.slider("Partisan Weight Multiplier", 0.0, 2.0, float(config.PARTISAN_WEIGHT_MULTIPLIER), 0.1)
             state_rank_multiplier = st.slider("State Rank Multiplier", 0.0, 2.0, float(config.STATE_RANK_MULTIPLIER), 0.1)
             
-            refresh_data = st.checkbox("Refresh Data", True)
+            force_refresh = st.checkbox("Force Refresh Data", False)
             
             submitted = st.form_submit_button("Apply Changes and Run Analysis")
     
@@ -315,7 +403,7 @@ def configuration_form():
             "POPULATION_WEIGHT_MULTIPLIER": population_weight_multiplier,
             "PARTISAN_WEIGHT_MULTIPLIER": partisan_weight_multiplier,
             "STATE_RANK_MULTIPLIER": state_rank_multiplier,
-            "REFRESH_DATA": refresh_data
+            "FORCE_REFRESH": force_refresh
         }
     return None
 
@@ -329,67 +417,74 @@ def main():
     
     # Configuration form
     new_config = configuration_form()
-    
+    force_refresh = False  # default
+
     if new_config:
         # Apply new configuration
         for key, value in new_config.items():
-            setattr(config, key, value)
+            if key != "FORCE_REFRESH":
+                setattr(config, key, value)
         st.success("Configuration updated. Reprocessing data...")
-        if new_config.pop("REFRESH_DATA", False):
-            st.info("Refreshing data from CSV URLs...")
+        force_refresh = new_config.get("FORCE_REFRESH", False)
+        if force_refresh:
+            st.info("Forcing data refresh...")
             # Clear the cache to force a refresh of the data
             st.cache_data.clear()
 
     # Load and process data
-    results_df = get_analysis_results()
+    config_vars = {
+        key: getattr(config, key)
+        for key in dir(config)
+        if key.isupper() and not key.startswith("__")
+    }
 
-    if not results_df.empty:
-        sufficient_data_df = results_df[results_df['message'].isnull()]
+    sufficient_data_df, results_df = load_and_process_data(config_vars, force_refresh)
 
-        if not sufficient_data_df.empty:
-            st.header("Differential Analysis")
-            create_differential_bar_chart(sufficient_data_df)
+    if not sufficient_data_df.empty:
+        st.header("Differential Analysis")
+        create_differential_bar_chart(sufficient_data_df)
 
-            st.header("Combined Analysis Over Time")
-            create_line_chart(sufficient_data_df, [
-                'harris_polling',
-                'harris_fav',
-                'harris_combined',
-                'trump_polling',
-                'trump_fav',
-                'trump_combined'
-            ], "Combined Analysis Over Time")
+        st.header("Combined Analysis Over Time")
+        create_line_chart(sufficient_data_df, [
+            'harris_polling',
+            'harris_fav',
+            'harris_combined',
+            'trump_polling',
+            'trump_fav',
+            'trump_combined'
+        ], "Combined Analysis Over Time")
 
-            st.header("Polling Results Over Time")
-            create_line_chart(sufficient_data_df, ['harris_polling', 'trump_polling'], "Polling Results Over Time")
+        st.header("Polling Results Over Time")
+        create_line_chart(sufficient_data_df, ['harris_polling', 'trump_polling'], "Polling Results Over Time")
 
-            st.header("Favorability Over Time")
-            if (
-                'harris_fav' in sufficient_data_df.columns and
-                'trump_fav' in sufficient_data_df.columns and
-                (sufficient_data_df['harris_fav'].notnull().any() or sufficient_data_df['trump_fav'].notnull().any())
-            ):
-                create_line_chart(
-                    sufficient_data_df,
-                    ['harris_fav', 'trump_fav'],
-                    "Favorability Over Time"
-                )
-            else:
-                st.warning("No favorability data available.")
-
-            st.header("Analysis Results")
-            st.write(sufficient_data_df)
+        st.header("Favorability Over Time")
+        if (
+            'harris_fav' in sufficient_data_df.columns and
+            'trump_fav' in sufficient_data_df.columns and
+            (sufficient_data_df['harris_fav'].notnull().any() or sufficient_data_df['trump_fav'].notnull().any())
+        ):
+            create_line_chart(
+                sufficient_data_df,
+                ['harris_fav', 'trump_fav'],
+                "Favorability Over Time"
+            )
         else:
-            st.warning("No sufficient data available for the selected periods.")
+            st.warning("No favorability data available.")
 
-        # Display messages for periods with insufficient data
+        st.header("Analysis Results")
+        st.write(sufficient_data_df)
+    else:
+        st.error("No data available.")
+
+    # Display messages for periods with insufficient data
+    if results_df is not None:
         insufficient_data_periods = results_df[results_df['message'].notnull()]
         if not insufficient_data_periods.empty:
             st.write("The following periods have insufficient data:")
             for _, row in insufficient_data_periods.iterrows():
                 st.write(f"- {row['period']}: {row['message']}")
     else:
-        st.error("No data available.")
+        st.warning("Unable to retrieve results for periods with insufficient data.")
 
     # Add download links for CSV files
     st.header("Download Raw Data")
