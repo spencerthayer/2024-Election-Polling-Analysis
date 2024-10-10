@@ -96,6 +96,7 @@ def create_line_chart(df: pd.DataFrame, y_columns: list, title: str):
 def create_differential_bar_chart(df: pd.DataFrame):
     """
     Creates a differential bar chart using Altair with the formatting from version 1.
+    Includes OOB variance in the tooltip but doesn't modify the existing calculations.
 
     Args:
         df (pd.DataFrame): DataFrame containing the data to plot.
@@ -130,7 +131,8 @@ def create_differential_bar_chart(df: pd.DataFrame):
         tooltip=[
             alt.Tooltip('differential:Q', format='+.2f', title='Differential'),
             alt.Tooltip('harris_combined:Q', format='.2f', title='Harris'),
-            alt.Tooltip('trump_combined:Q', format='.2f', title='Trump')
+            alt.Tooltip('trump_combined:Q', format='.2f', title='Trump'),
+            alt.Tooltip('oob_variance:Q', format='.2f', title='OOB Variance')
         ]
     )
 
@@ -141,6 +143,7 @@ def create_differential_bar_chart(df: pd.DataFrame):
         y=alt.Y('zero:Q'),
         y2=alt.Y2('low:Q')
     ).transform_calculate(
+        # zero='datum.trump_moe*((100-(datum.differential*10))*.01)*1 + (datum.oob_variance * 0.5)',
         zero='datum.trump_moe*((100-(datum.differential*10))*.01)*1',
         low='datum.trump_moe*-1'
     )
