@@ -6,6 +6,7 @@ import altair as alt
 from datetime import datetime
 from analysis import get_analysis_results
 import config
+from config import *
 
 # Constants imported from config.py
 TRUMP_COLOR_DARK = config.TRUMP_COLOR_DARK
@@ -189,6 +190,8 @@ def main():
     # Set up the Streamlit page configuration
     st.set_page_config(page_title="Election Polling Analysis", layout="wide")
     st.title("Election Polling Analysis")
+    
+    
 
     # Load and process data
     results_df = load_and_process_data()
@@ -251,9 +254,17 @@ def main():
     else:
         st.error("No data available.")
 
+
+    # Add download links for CSV files
+    st.header("Download Raw Data")
+    st.markdown(f"[Download Polling Data CSV]({POLLING_URL})")
+    st.markdown(f"[Download Favorability Data CSV]({FAVORABILITY_URL})")
+
     # Footer
     st.markdown("---")
     st.write(f"Developed by Spencer Thayer. Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # Add this code at the bottom of your app.py file, just before the if __name__ == "__main__": line
 
 if __name__ == "__main__":
     main()
