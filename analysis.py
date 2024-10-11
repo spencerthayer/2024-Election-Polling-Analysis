@@ -42,6 +42,7 @@ def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = Non
     Preprocess the data by converting date columns, handling missing values, and calculating necessary weights.
     """
     df = df.copy()
+
     # Specify the date format based on your data
     date_format = '%m/%d/%y %H:%M'
     df['created_at'] = pd.to_datetime(df['created_at'], format=date_format, errors='coerce', utc=True)
@@ -89,7 +90,7 @@ def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = Non
     if max_sample_size - min_sample_size > 0:
         df['sample_size_weight'] = (df['sample_size'] - min_sample_size) / (max_sample_size - min_sample_size)
     else:
-        df['sample_size_weight'] = 1.0
+        df['sample_size_weight'] = config.ZERO_CORRECTION
 
     # Handle population_weight
     if 'population' in df.columns:
@@ -97,11 +98,21 @@ def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = Non
         df['population_weight'] = df['population'].map(lambda x: config.POPULATION_WEIGHTS.get(x, 1.0))
     else:
         logging.warning("'population' column is missing. Setting 'population_weight' to 1 for all rows.")
-        df['population_weight'] = 1.0
+        df['population_weight'] = config.ZERO_CORRECTION
 
-    # Handle is_partisan and partisan_weight
-    df['is_partisan'] = df['partisan'].notna() & df['partisan'].ne('')
-    df['partisan_weight'] = df['is_partisan'].map(config.PARTISAN_WEIGHT)
+    # Handle is_partisan flag
+    df['partisan'] = df['partisan'].fillna('').astype(str).str.strip()
+    df['is_partisan'] = df['partisan'] != ''
+
+    # Apply partisan weight mapping here
+    df['partisan_weight'] = df['is_partisan'].map({
+        True: config.PARTISAN_WEIGHT[True],
+        False: config.PARTISAN_WEIGHT[False]
+    })
+
+    # Logging for debugging
+    logging.debug(f"Unique partisan values: {df['partisan'].unique()}")
+    logging.debug(f"Count of partisan polls: {df['is_partisan'].sum()}")
 
     # Calculate state_rank using get_state_data()
     state_data = get_state_data()
@@ -158,6 +169,12 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
     df = df.copy()
     # Ensure 'pct' is correctly interpreted as a percentage
     df['pct'] = df['pct'].apply(lambda x: x if x > 1 else x * 100)
+
+    # Apply partisan weight mapping here
+    df['partisan_weight'] = df['is_partisan'].map({
+        True: config.PARTISAN_WEIGHT[True],
+        False: config.PARTISAN_WEIGHT[False]
+    })
 
     # Prepare the weights with multipliers
     list_weights = np.array([
@@ -270,7 +287,8 @@ def calculate_oob_variance(df: pd.DataFrame) -> float:
     if df.empty:
         return 0.0  # Return 0 variance if DataFrame is empty
 
-    features_columns = [
+    # Define all possible feature columns
+    all_features = [
         'normalized_numeric_grade',
         'normalized_pollscore',
         'normalized_transparency_score',
@@ -280,6 +298,14 @@ def calculate_oob_variance(df: pd.DataFrame) -> float:
         'state_rank',
         'time_decay_weight'
     ]
+
+    # Filter to only use columns that exist in the DataFrame
+    features_columns = [col for col in all_features if col in df.columns]
+
+    if not features_columns:
+        logging.warning("No valid feature columns found for OOB variance calculation.")
+        return 0.0
+
     X = df[features_columns].values
     y = df['favorable'].values
 
@@ -294,12 +320,14 @@ def calculate_oob_variance(df: pd.DataFrame) -> float:
         ))
     ])
 
-    pipeline.fit(X, y)
-
-    oob_predictions = pipeline.named_steps['model'].oob_prediction_
-    oob_variance = np.var(y - oob_predictions)
-
-    return oob_variance
+    try:
+        pipeline.fit(X, y)
+        oob_predictions = pipeline.named_steps['model'].oob_prediction_
+        oob_variance = np.var(y - oob_predictions)
+        return oob_variance
+    except Exception as e:
+        logging.error(f"Error in OOB variance calculation: {e}")
+        return 0.0
 
 def impute_data(X: np.ndarray) -> np.ndarray:
     """

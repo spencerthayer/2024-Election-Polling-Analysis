@@ -161,25 +161,102 @@ Where:
 
 - If a state is not found in the `state_data`, a default rank of 1.0 is assigned to prevent errors.
 
-### 8. Combining Weights
+### 8. **Combining Weights**
 
-The combined weight of each poll is calculated differently based on the `HEAVY_WEIGHT` setting:
+The script uses multiplicative or additive combinatorial methods based on the `HEAVY_WEIGHT` parameter, combining individual weights such as time decay, pollster grade, transparency, sample size, population, partisan status, and state rank. In the `calculate_polling_metrics` function of the `analysis.py` script, the combined weight is calculated as follows:
 
-- If `HEAVY_WEIGHT` is `True`:
+```python
+# Prepare the weights with multipliers
+list_weights = np.array([
+    df['time_decay_weight'] * config.TIME_DECAY_WEIGHT_MULTIPLIER,
+    df['sample_size_weight'] * config.SAMPLE_SIZE_WEIGHT_MULTIPLIER,
+    df['normalized_numeric_grade'] * config.NORMALIZED_NUMERIC_GRADE_MULTIPLIER,
+    df['normalized_pollscore'] * config.NORMALIZED_POLLSCORE_MULTIPLIER,
+    df['normalized_transparency_score'] * config.NORMALIZED_TRANSPARENCY_SCORE_MULTIPLIER,
+    df['population_weight'] * config.POPULATION_WEIGHT_MULTIPLIER,
+    df['partisan_weight'] * config.PARTISAN_WEIGHT_MULTIPLIER,
+    df['state_rank'] * config.STATE_RANK_MULTIPLIER,
+])
 
-  $$
-  W_{\text{combined}} = \prod_{i} W_{i}
-  $$
+# Combine weights according to the HEAVY_WEIGHT flag
+if config.HEAVY_WEIGHT:
+    df['combined_weight'] = np.prod(list_weights, axis=0)
+else:
+    df['combined_weight'] = np.mean(list_weights, axis=0)
+```
 
-- If `HEAVY_WEIGHT` is `False`:
+### **Explanation of the Weight Combination**
 
-  $$
-  W_{\text{combined}} = \frac{1}{n} \sum_{i} W_{i}
-  $$
+- **When `HEAVY_WEIGHT` is `True`:**
 
-  Where \( n \) is the number of individual weights.
+  The combined weight is calculated by **multiplying** all individual weights:
 
-In the updated version, when `HEAVY_WEIGHT` is `False`, the mean is calculated correctly by specifying the axis to ensure per-sample weights are computed accurately.
+  $$ W_{\text{combined}} = \prod_{i} W_i $$
+
+  This multiplicative approach emphasizes the impact of each weight. If any individual weight is small (e.g., close to zero), it will significantly reduce the combined weight.
+
+- **When `HEAVY_WEIGHT` is `False`:**
+
+  The combined weight is calculated by **averaging** all individual weights:
+
+  $$ W_{\text{combined}} = \frac{\sum_{i} W_i}{n} $$
+
+  where \( n \) is the number of individual weights.
+
+  This additive approach balances the weights, ensuring that no single weight disproportionately influences the combined weight.
+
+### **Implications of the Weighting Methods**
+
+- **Multiplicative Weighting (`HEAVY_WEIGHT = True`):**
+
+  - **Pros:**
+    - Ensures that all criteria must be met to achieve a high combined weight.
+    - Any low individual weight will reduce the overall weight, highlighting polls that excel across all metrics.
+
+  - **Cons:**
+    - Can overly penalize polls due to a single low weight.
+    - May result in very small combined weights, making it harder for differences to emerge.
+
+- **Additive Weighting (`HEAVY_WEIGHT = False`):**
+
+  - **Pros:**
+    - Allows for compensations between weights; a low score in one area can be offset by higher scores in others.
+    - Provides a more balanced assessment when individual weights vary.
+
+  - **Cons:**
+    - May not penalize polls sufficiently for poor performance in critical areas.
+    - Can dilute the impact of particularly important weights.
+
+### **Adjusting the Weighting Strategy**
+
+You can control how the weights are combined by setting the `HEAVY_WEIGHT` parameter in your `config.py` file:
+
+```python
+# config.py
+
+HEAVY_WEIGHT = True  # Use multiplicative weighting
+# or
+HEAVY_WEIGHT = False  # Use additive weighting
+```
+
+### **Customizing Individual Weights**
+
+Additionally, you can adjust the multipliers for each individual weight to fine-tune their impact:
+
+```python
+# config.py
+
+TIME_DECAY_WEIGHT_MULTIPLIER = 1.0
+SAMPLE_SIZE_WEIGHT_MULTIPLIER = 1.0
+NORMALIZED_NUMERIC_GRADE_MULTIPLIER = 1.0
+NORMALIZED_POLLSCORE_MULTIPLIER = 1.0
+NORMALIZED_TRANSPARENCY_SCORE_MULTIPLIER = 1.0
+POPULATION_WEIGHT_MULTIPLIER = 1.0
+PARTISAN_WEIGHT_MULTIPLIER = 1.0
+STATE_RANK_MULTIPLIER = 1.0
+```
+
+By increasing or decreasing these multipliers, you can amplify or diminish the influence of specific weights in the combined calculation.
 
 ### 9. Calculating Polling Metrics
 
