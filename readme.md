@@ -3,7 +3,7 @@
 This Python project is designed to fetch, process, and analyze presidential polling data, providing a comprehensive and nuanced assessment of the current electoral landscape. It consists of several main scripts:
 
 - **`analysis.py`**: The core script responsible for data fetching, processing, and applying various weighting mechanisms to adjust poll results.
-- **`states.py`**: A script that scrapes state-specific electoral data from the [270 To Win](https://www.270towin.com/) website, enhancing the analysis with state-level insights.
+- **`states.py`**: A script that scrapes state-specific electoral data from both the [270 To Win](https://www.270towin.com/) website and [FiveThirtyEight](https://projects.fivethirtyeight.com/), enhancing the analysis with state-level insights.
 - **`app.py`**: A Streamlit application that provides an interactive user interface for visualizing results and adjusting configuration parameters dynamically.
 - **`config.py`**: A configuration file containing adjustable parameters that control the behavior of the analysis.
 
@@ -74,13 +74,15 @@ The project relies on three primary data sources to ensure a robust and comprehe
    - **Method of Acquisition**: Similar to the presidential polling data, it is fetched and processed into a `pandas` DataFrame.
 
 3. **State Data**:
-   - **Source**: [270 To Win](https://www.270towin.com/)
-   - **Description**: Contains information about each state's electoral votes and political leanings, essential for calculating state-specific weights.
-   - **Method of Acquisition**: The `states.py` script scrapes the website and processes the data into a usable format.
+   - **Sources**:
+     - [270 To Win](https://www.270towin.com/)
+     - [FiveThirtyEight Forecast Data](https://projects.fivethirtyeight.com/2024-election-forecast/priors.json)
+   - **Description**: Contains information about each state's electoral votes, political leanings, and forecasted election outcomes, essential for calculating state-specific weights.
+   - **Method of Acquisition**: The `states.py` script scrapes and processes data from both websites to obtain up-to-date state rankings and forecasts.
 
 **Justification for Data Sources**:
 
-- **FiveThirtyEight**: Renowned for its rigorous methodology and comprehensive data, making it a reliable source for polling information.
+- **FiveThirtyEight**: Renowned for its rigorous methodology and comprehensive data, making it a reliable source for polling and forecast information.
 - **270 To Win**: Provides up-to-date and detailed electoral data, essential for state-level analysis.
 
 ---
@@ -254,76 +256,61 @@ $$
 
 ### 7. State Rank Weight
 
-The **State Rank Weight** integrates the electoral significance and political leaning of each state into the overall weighting of polls. This weight ensures that polls from states that are more influential in the electoral college and have competitive political landscapes are given greater consideration in the analysis. By accounting for both the number of electoral votes and the state's partisan lean, the model emphasizes data from states that are more likely to impact the election outcome.
+The **State Rank Weight** integrates the electoral significance, political leaning, and current forecasts of each state into the overall weighting of polls. This weight ensures that polls from states that are more influential in the electoral college, have competitive political landscapes, and are projected to have close races are given greater consideration in the analysis.
 
-**Objective**: To calculate a weight for each poll based on the state's electoral importance and its partisan classification, thereby prioritizing polls from significant and competitive states.
+**Objective**: To calculate a weight for each poll based on the state's electoral importance, partisan classification, and current election forecasts, thereby prioritizing polls from significant and competitive states.
 
 **Mathematical Formulation**:
 
+The state rank for each state is calculated as a weighted sum of three components:
+
 $$
-W_{\text{state}} = \text{Pro Status Value} + \left( \frac{\text{Electoral Votes}}{\text{Total Electoral Votes}} \right)
+\text{State Rank} = (\text{Pro Status Value} \times 0.4) + (\text{Normalized Electoral Votes} \times 0.3) + (\text{Forecast Weight} \times 0.3)
 $$
 
 Where:
 
-- **\( \text{Pro Status Value} \)**: A numerical representation of the state's partisan lean.
-- **\( \text{Electoral Votes} \)**: The number of electoral votes assigned to the state.
-- **\( \text{Total Electoral Votes} = 538 \)**: The total number of electoral votes across all states and the District of Columbia.
+- **Pro Status Value**: A numerical representation of the state's partisan lean, derived from the `pro_status` codes provided by 270 To Win.
+- **Normalized Electoral Votes**: The state's electoral votes divided by the total electoral votes (538), representing the state's relative electoral significance.
+- **Forecast Weight**: Based on FiveThirtyEight's forecast data, representing the closeness of the race in each state.
 
-**Pro Status Values**:
+**Components Explanation**:
 
-| Code | Pro Status Value | Description              |
-|------|------------------|--------------------------|
-| `T`  | 0.8              | Toss-up state            |
-| `D1` | 0.6              | Slightly Democratic      |
-| `D2` | 0.4              | Moderately Democratic    |
-| `D3` | 0.2              | Strongly Democratic      |
-| `D4` | 0.1              | Solidly Democratic       |
-| `R1` | 0.6              | Slightly Republican      |
-| `R2` | 0.4              | Moderately Republican    |
-| `R3` | 0.2              | Strongly Republican      |
-| `R4` | 0.1              | Solidly Republican       |
+1. **Pro Status Value (40% of State Rank)**:
+   - Derived from the state's political classification:
+     - `T`: Toss-up state (0.8)
+     - `D1`, `R1`: Tilts Democrat/Republican (0.6)
+     - `D2`, `R2`: Leans Democrat/Republican (0.4)
+     - `D3`, `R3`: Likely Democrat/Republican (0.2)
+     - `D4`, `R4`: Safe Democrat/Republican (0.1)
+   - **Justification**: Reflects the competitiveness of the state based on historical and current political leanings, with higher values for more competitive states.
 
-**Explanation and Justification**:
+2. **Normalized Electoral Votes (30% of State Rank)**:
+   - Calculated as:
+     $$
+     \text{Normalized Electoral Votes} = \frac{\text{State's Electoral Votes}}{538}
+     $$
+   - **Justification**: Gives more weight to states with more electoral votes, reflecting their greater potential impact on the election outcome.
 
-1. **Electoral Votes**:
-   - **Significance**: States with more electoral votes have a greater capacity to influence the outcome of a presidential election due to the winner-takes-all nature (in most states) of the electoral college system.
-   - **Calculation**: The fraction \( \frac{\text{Electoral Votes}}{\text{Total Electoral Votes}} \) normalizes the state's electoral votes, ensuring the weight is proportional to its potential impact.
-   - **Implication**: Polls from populous states like California or Texas will have a higher weight due to their larger share of electoral votes.
-
-2. **Pro Status Value**:
-   - **Purpose**: Reflects the competitive nature of a state's political leaning, with higher values assigned to states that are more contested.
-   - **Assignment**: Based on the state's classification, with toss-up states (`T`) receiving the highest value, as they are the most unpredictable and potentially pivotal.
-   - **Implication**: Polls from battleground states receive a boost in weight, emphasizing their importance in forecasting the election outcome.
-
-3. **Combination of Factors**:
-   - By adding the Pro Status Value to the normalized electoral votes, the model captures both the quantitative and qualitative aspects of a state's significance.
-   - This dual consideration ensures that both the size and competitiveness of a state are factored into the weight, providing a more nuanced assessment.
+3. **Forecast Weight (30% of State Rank)**:
+   - Calculated as:
+     $$
+     \text{Forecast Weight} = 1 - \left( \frac{|\text{Forecast Median}|}{100} \right)
+     $$
+     - **Forecast Median**: The median forecasted margin between the candidates from FiveThirtyEight's data.
+   - **Justification**: Prioritizes states with closer races, as they are more likely to influence the election outcome.
 
 **Implementation Details**:
 
 - **Data Retrieval**:
-  - The `states.py` script is responsible for scraping and compiling the necessary state data from the [270 To Win](https://www.270towin.com/) website.
-  - This data includes each state's number of electoral votes and its partisan classification (`Pro Status`).
-
-- **Handling Missing Data**:
-  - If a poll pertains to a state not found in the dataset (e.g., due to a data retrieval error or a new state classification), a default weight is assigned to prevent computational errors.
-  - **Default Weight**: A reasonable default, such as the average or median of existing State Rank Weights, can be used to maintain consistency.
-
-- **Calculation Steps**:
-  1. **Normalize Electoral Votes**:
-     - For each state, calculate \( \frac{\text{Electoral Votes}}{538} \).
-     - This value ranges between approximately 0.002 (for states with 1 electoral vote) and 0.102 (for California with 55 electoral votes).
-
-  2. **Assign Pro Status Value**:
-     - Map each state's partisan classification to its corresponding Pro Status Value using the provided table.
-
-  3. **Compute State Rank Weight**:
-     - Sum the Pro Status Value and the normalized electoral votes for each state.
-     - \( W_{\text{state}} = \text{Pro Status Value} + \left( \frac{\text{Electoral Votes}}{538} \right) \)
-
+  - The `states.py` script fetches:
+    - `pro_status` codes and electoral votes from 270 To Win.
+    - Forecast medians from FiveThirtyEight's forecast JSON data.
+- **State Rank Calculation**:
+  - Each state's rank is calculated using the weighted sum formula above.
+  - The ranks are normalized and used as weights in the polling analysis.
 - **Incorporation into Combined Weight**:
-  - The State Rank Weight \( W_{\text{state}} \) is included as one of the factors in the combined weight calculation (see [Combining Weights](#8-combining-weights)).
+  - The State Rank Weight is included as one of the factors in the combined weight calculation (see [Combining Weights](#8-combining-weights)).
   - Its influence can be adjusted using the `STATE_RANK_MULTIPLIER` in `config.py`:
     ```python
     STATE_RANK_MULTIPLIER = 1.0  # Adjust to increase or decrease influence
@@ -332,28 +319,40 @@ Where:
 **Considerations**:
 
 - **Dynamic Political Landscape**:
-  - The partisan leanings of states can change over time. Regular updates to the Pro Status classifications are necessary to ensure accuracy.
-  - Incorporating recent election results, demographic shifts, and current polling data can help refine the Pro Status Values.
-
+  - The state's `pro_status` and forecast data are regularly updated to reflect the most current information.
+- **Data Handling**:
+  - If forecast data is missing for a state, a default value is used to prevent computational errors.
 - **Weight Sensitivity**:
-  - Analysts should be cautious when assigning Pro Status Values, as they can significantly affect the Combined Weight.
-  - Sensitivity analysis can help determine the impact of different Pro Status assignments on the final polling metrics.
+  - The weighting percentages (40%, 30%, 30%) can be adjusted to emphasize different components based on analytical needs.
 
-- **Justification for Method**:
-  - By quantifying both the size and competitiveness of states, the State Rank Weight aligns the analysis with the realities of the U.S. electoral system.
-  - This approach acknowledges that winning in larger or more competitive states is more consequential for a candidate's success.
+**Example Calculation**:
 
-The State Rank Weight is a critical component in adjusting polling data to reflect the strategic importance of each state in a presidential election. By combining the quantitative factor of electoral votes with the qualitative assessment of partisan leanings, this weight ensures that the analysis emphasizes polls from states that are most likely to influence the election outcome. This method enhances the model's predictive power and provides a more accurate representation of the electoral landscape.
+Suppose we have a state with the following characteristics:
+
+- **Pro Status**: `T` (Toss-up state), so `Pro Status Value = 0.8`
+- **Electoral Votes**: 20, so `Normalized Electoral Votes = 20 / 538 ≈ 0.0372`
+- **Forecast Median**: 2.5 (indicating a close race), so:
+  $$
+  \text{Forecast Weight} = 1 - \left( \frac{2.5}{100} \right) = 0.975
+  $$
+
+The State Rank would be:
+
+$$
+\text{State Rank} = (0.8 \times 0.4) + (0.0372 \times 0.3) + (0.975 \times 0.3) \\
+= 0.32 + 0.01116 + 0.2925 \\
+\approx 0.62366
+$$
+
+This high rank indicates that the state is both competitive and significant in terms of electoral votes and current forecasts.
 
 ### 8. Combining Weights
 
-An essential step in the analysis is to aggregate the individual weights calculated from various factors into a single **Combined Weight** for each poll. This combined weight determines the overall influence each poll will have on the final polling metrics. The method of combining these weights can significantly impact the results, and thus, it is crucial to choose an approach that aligns with the objectives of the analysis.
+An essential step in the analysis is to aggregate the individual weights calculated from various factors into a single **Combined Weight** for each poll. This combined weight determines the overall influence each poll will have on the final polling metrics.
 
-**Objective**: To aggregate the individual weights—such as Time Decay Weight, Grade Weight, Transparency Weight, Sample Size Weight, Partisan Weight, Population Weight, and State Rank Weight—into a single Combined Weight for each poll, reflecting the cumulative effect of all weighting factors.
+**Objective**: To combine individual weights into a single weight that reflects all factors influencing poll reliability and relevance.
 
 **Methods of Combining Weights**:
-
-There are two primary methods for combining the individual weights, each with its own implications:
 
 1. **Multiplicative Combination** (when `HEAVY_WEIGHT = True`):
 
@@ -361,14 +360,11 @@ There are two primary methods for combining the individual weights, each with it
    W_{\text{combined}} = \prod_{k} \left( W_k \times \text{Multiplier}_k \right)
    $$
 
-   Where:
-   - \( W_k \) is the \( k \)-th individual weight.
-   - \( \text{Multiplier}_k \) is the multiplier applied to the \( k \)-th weight to adjust its influence.
-
-   **Justification**:
-   - **Emphasizing All Criteria**: The multiplicative method ensures that a low value in any single weight significantly reduces the Combined Weight. This means that a poll must score well across all criteria to have a high Combined Weight.
-   - **Interaction Effects**: Multiplication accounts for interaction effects between weights, recognizing that the combined effect of multiple strong or weak weights is more than additive.
-   - **Penalizing Weaknesses**: If a poll is weak in one area (e.g., low sample size), the multiplicative method penalizes it more heavily, reducing its overall influence.
+   - **Pros**:
+     - Strongly penalizes polls weak in any single criterion.
+     - Emphasizes high-quality polls.
+   - **Cons**:
+     - Can overly penalize polls with minor weaknesses.
 
 2. **Additive Combination** (when `HEAVY_WEIGHT = False`):
 
@@ -376,25 +372,15 @@ There are two primary methods for combining the individual weights, each with it
    W_{\text{combined}} = \frac{\sum_{k} \left( W_k \times \text{Multiplier}_k \right)}{n}
    $$
 
-   Where:
-   - \( n \) is the total number of weights being combined.
-   - The other variables are as previously defined.
-
-   **Justification**:
-   - **Balancing Influence**: The additive method balances the influence of each weight, preventing any single weight from disproportionately affecting the Combined Weight.
-   - **Mitigating Extreme Values**: It reduces the impact of extreme values in individual weights, leading to a more stable Combined Weight.
-   - **Simplicity**: The additive method is straightforward and easy to interpret, which can be advantageous for transparency.
+   - **Pros**:
+     - Balances the influence of each weight.
+     - More forgiving of polls with mixed strengths and weaknesses.
+   - **Cons**:
+     - May allow lower-quality polls to have more influence than desired.
 
 **Multipliers**:
 
-To fine-tune the influence of each individual weight, **Multipliers** are introduced:
-
-- Each weight \( W_k \) is multiplied by a corresponding **Multiplier** \( \text{Multiplier}_k \).
-- Multipliers allow analysts to adjust the importance of each weighting factor based on domain knowledge, data quality, or strategic considerations.
-
-**Default Multipliers in `config.py`**:
-
-By default, all multipliers are set to `1.0`, implying that all weights have equal influence unless specified otherwise. The multipliers can be adjusted in the `config.py` file or via the Streamlit app interface.
+Multipliers adjust the influence of each individual weight:
 
 ```python
 TIME_DECAY_WEIGHT_MULTIPLIER = 1.0
@@ -407,290 +393,101 @@ PARTISAN_WEIGHT_MULTIPLIER = 1.0
 STATE_RANK_MULTIPLIER = 1.0
 ```
 
-**Explanation of Multipliers**:
-
-- **Time Decay Weight Multiplier**: Adjusts the influence of the poll's recency. Increasing this multiplier emphasizes the importance of recent polls.
-- **Sample Size Weight Multiplier**: Modifies the impact of the poll's sample size on the Combined Weight.
-- **Normalized Numeric Grade Multiplier**: Alters the significance of the pollster's historical accuracy.
-- **Normalized Pollscore Multiplier**: Adjusts the influence of the pollster's overall score provided by external evaluations.
-- **Normalized Transparency Score Multiplier**: Changes how much the transparency of the pollster affects the Combined Weight.
-- **Population Weight Multiplier**: Modifies the impact of the type of population surveyed (e.g., likely voters vs. all adults).
-- **Partisan Weight Multiplier**: Adjusts the influence of the poll's partisan status.
-- **State Rank Multiplier**: Alters the weight given to polls based on the state's electoral significance.
-
-**Implementation Details**:
-
-- **Adjusting `HEAVY_WEIGHT`**:
-  - Set `HEAVY_WEIGHT = True` for multiplicative combination.
-  - Set `HEAVY_WEIGHT = False` for additive combination.
-  - This parameter can be modified in `config.py` or through the Streamlit app.
-
-- **Adjusting Multipliers**:
-  - Multipliers can be increased or decreased to amplify or diminish the influence of specific weights.
-  - **Example**:
-    - If you believe that the time when a poll was conducted is critically important, you might set `TIME_DECAY_WEIGHT_MULTIPLIER = 2.0`. This change would double the influence of the Time Decay Weight in the Combined Weight calculation.
-    - Conversely, if you think the sample size is less critical, you might set `SAMPLE_SIZE_WEIGHT_MULTIPLIER = 0.5` to reduce its influence.
-
-- **Calculating the Combined Weight**:
-  - For each poll, calculate the Combined Weight using the chosen method (multiplicative or additive) and the specified multipliers.
-  - Ensure that all individual weights \( W_k \) and their corresponding multipliers \( \text{Multiplier}_k \) are accurately calculated and applied.
-
-**Considerations When Choosing the Combination Method**:
-
-- **Multiplicative Combination**:
-  - **Pros**:
-    - Strongly penalizes polls that are deficient in any single criterion.
-    - Highlights polls that are consistently strong across all factors.
-    - Suitable when you want only the highest-quality polls to have significant influence.
-  - **Cons**:
-    - Can excessively reduce the influence of polls with minor deficiencies.
-    - May lead to very small Combined Weights, potentially reducing the overall number of polls that significantly impact the analysis.
-
-- **Additive Combination**:
-  - **Pros**:
-    - Provides a balanced approach where no single weight can dominate.
-    - More forgiving of polls that are strong in some areas but weaker in others.
-    - Useful when a broader inclusion of polls is desired.
-  - **Cons**:
-    - May allow lower-quality polls to have a more substantial influence than desired.
-    - Does not account for interaction effects between weights.
-
-**Best Practices**:
-
-- **Consistency with Analysis Goals**:
-  - Choose the combination method that aligns with the objectives of your analysis. For instance, if the goal is to prioritize only the most reliable and relevant polls, the multiplicative method may be more appropriate.
-  
-- **Sensitivity Analysis**:
-  - Perform sensitivity analyses by experimenting with different multipliers and combination methods to observe how changes affect the final results.
-  - This can help identify which weights have the most significant impact and ensure that the model behaves as expected under various scenarios.
-
-- **Documentation and Transparency**:
-  - Clearly document any changes made to the default multipliers and the reasons for those changes.
-  - Transparency in the weighting process enhances the credibility of the analysis and allows others to understand and replicate your work.
-
 **Implementation Steps**:
 
-1. **Calculate Individual Weights**:
-   - Compute each individual weight \( W_k \) for every poll as described in the previous sections.
-
-2. **Apply Multipliers**:
-   - Multiply each weight \( W_k \) by its corresponding multiplier \( \text{Multiplier}_k \).
-
-3. **Combine Weights**:
-   - Use either the multiplicative or additive method to calculate the Combined Weight \( W_{\text{combined}} \) for each poll.
-
-4. **Normalize Combined Weights** (Optional):
-   - Depending on the distribution of Combined Weights, you may choose to normalize them to ensure they are on a consistent scale for further calculations.
-
-5. **Incorporate Combined Weights into Analysis**:
-   - Use the Combined Weights in subsequent calculations, such as computing the weighted averages for polling metrics and favorability differentials.
-
-By carefully combining the individual weights using the methods and considerations outlined above, the analysis effectively synthesizes multiple factors influencing poll reliability and relevance. This comprehensive weighting mechanism enhances the robustness and accuracy of the final polling metrics, providing a more nuanced and credible assessment of the electoral landscape.
+1. **Calculate Individual Weights**: Compute each weight as described in the previous sections.
+2. **Apply Multipliers**: Multiply each weight by its corresponding multiplier.
+3. **Combine Weights**: Use the chosen method (multiplicative or additive) to compute the combined weight.
+4. **Normalize Combined Weights** (Optional): Ensure combined weights are on a consistent scale.
 
 ### 9. Calculating Polling Metrics
 
-Accurately assessing each candidate's standing requires a methodical aggregation of polling data, adjusted by the combined weights calculated from various influencing factors. The objective is to compute a weighted average polling metric for each candidate that reflects the combined influence of all previously determined weights. This ensures that polls contributing to the final metric are appropriately scaled based on their reliability, recency, sample size, and other relevant criteria.
-
-**Objective**: To compute an adjusted polling metric for each candidate by combining individual poll results with their respective combined weights, resulting in a weighted average that more accurately represents the candidate's support.
+**Objective**: To compute an adjusted polling metric for each candidate by combining poll results with their respective combined weights.
 
 **Methodology**:
 
-1. **Data Filtering**: Begin by selecting polls within the specified time frame and for the candidates of interest. This ensures that the analysis is based on current and relevant data. Filtering involves:
-
-   - Choosing polls conducted within a recent period (e.g., the last two weeks).
-   - Including only the candidates being analyzed.
-   - Excluding polls with missing or incomplete data that could skew results.
-
-2. **Percentage Handling**:
-
-   - **Standardization**: Ensure that all percentage values (`pct`) are correctly interpreted and consistently formatted. Polling data may represent percentages either as whole numbers (e.g., `45%`) or decimals (e.g., `0.45`).
-   - **Adjustment**: If a percentage value is less than or equal to 1, it is assumed to be in decimal form and multiplied by 100 to convert it to a standard percentage format. This standardization is crucial to maintain consistency across all data points and prevent calculation errors.
-
-3. **Combined Weight Calculation**: Use the method described in [Combining Weights](#8-combining-weights) to calculate the **Combined Weight** \( W_{\text{combined}, i} \) for each poll \( i \). This weight integrates all individual weights such as time decay, pollster grade, sample size, partisanship, population type, and state significance. The combined weight reflects the overall reliability and relevance of each poll.
-
+1. **Data Filtering**: Select relevant polls for the candidates within the specified time frame.
+2. **Percentage Handling**: Standardize percentage values to ensure consistency.
+3. **Combined Weight Calculation**: Calculate the combined weight for each poll.
 4. **Weighted Sum and Total Weights**:
-
-   - **Weighted Sum** for candidate \( c \):
+   - **Weighted Sum**:
      $$
      \text{Weighted Sum}_c = \sum_{i \in c} W_{\text{combined}, i} \times \text{pct}_i
      $$
-     - This sum aggregates the contributions of all polls for candidate \( c \), each adjusted by its combined weight. It represents the total weighted support for the candidate across all considered polls.
-
-   - **Total Weight** for candidate \( c \):
-     $$
-     \text{Total Weight}_c = \sum_{i \in c} W_{\text{combined}, i}
-     $$
-     - The total weight is the sum of the combined weights for all polls related to candidate \( c \). It serves as the normalizing factor for calculating the weighted average.
-
-5. **Weighted Average**:
-   $$
-   \text{Weighted Average}_c = \frac{\text{Weighted Sum}_c}{\text{Total Weight}_c}
-   $$
-   - **Explanation**: The weighted average represents the adjusted polling percentage for candidate \( c \), accounting for the varying importance of each poll as determined by their combined weights.
-   - **Justification**: This method ensures that polls deemed more reliable and relevant have a greater influence on the final metric, providing a more accurate reflection of each candidate's standing.
-
-6. **Margin of Error Calculation**:
-
-   - **Effective Sample Size**:
-     $$
-     n_{\text{effective}} = \sum_{i} W_{\text{combined}, i} \times n_i
-     $$
-     - Where \( n_i \) is the sample size of poll \( i \).
-     - **Explanation**: The effective sample size accounts for both the actual number of respondents and the reliability of each poll. It provides a basis for estimating the statistical uncertainty of the weighted average.
-
-   - **Proportion**:
-     $$
-     p = \frac{\text{Weighted Average}_c}{100}
-     $$
-     - Converts the weighted average percentage into a decimal proportion for use in statistical formulas.
-
-   - **Margin of Error**:
-     $$
-     \text{Margin of Error}_c = z \times \sqrt{\frac{p(1 - p)}{n_{\text{effective}}}} \times 100\%
-     $$
-     - **\( z \)**: The z-score corresponding to the desired confidence level (default is \( 1.96 \) for 95% confidence).
-     - **Explanation**: This formula calculates the margin of error for candidate \( c \), reflecting the uncertainty associated with the weighted average due to sampling variability.
-     - **Justification**: Providing the margin of error allows for the interpretation of the weighted average within a confidence interval, acknowledging the inherent uncertainty in polling data.
-
-**Implementation Details**:
-
-- **Data Integrity**: Ensure that all combined weights, percentages, and sample sizes are accurately calculated and consistently formatted. This may involve:
-
-  - Validating data entries for correctness.
-  - Handling any anomalies or outliers appropriately.
-  - Confirming that all necessary data fields are present and correctly aligned.
-
-- **Handling Missing or Anomalous Data**:
-
-  - **Missing Data**: If certain data points (e.g., sample size or percentage) are missing, decide whether to exclude the poll or use imputation methods to estimate the missing values.
-  - **Anomalies**: Identify and address any outliers or inconsistencies that could disproportionately affect the results, such as extremely high or low percentages not consistent with other polls.
-
-- **Consistency and Accuracy**:
-
-  - Maintain consistency in units and numerical formats throughout all calculations.
-  - Use precise numerical methods and appropriate data types to prevent rounding errors or loss of significant digits.
-  - Double-check calculations, especially when aggregating sums and averages, to ensure accuracy.
-
-By meticulously applying these steps, the analysis yields an adjusted polling metric for each candidate that more accurately reflects their level of support. This rigorous approach enhances the credibility of the results and provides a solid foundation for further electoral analysis, strategic decision-making, and public understanding of the current political landscape.
-
-### 10. Calculating Favorability Differential
-
-Understanding public sentiment toward each candidate extends beyond measuring direct voting intention; it encompasses how favorably or unfavorably the electorate views them. The **Favorability Differential** captures this sentiment by considering both positive and negative perceptions. Incorporating this metric into the analysis provides a deeper insight into a candidate's overall appeal and potential influence on undecided voters or those who might change their preference.
-
-**Objective**: To calculate a weighted favorability differential for each candidate, reflecting the net public sentiment by accounting for both favorable and unfavorable opinions. This differential helps adjust the polling results to include broader perceptions that might not be immediately evident from voting intention polls alone.
-
-**Methodology**:
-
-1. **Data Filtering**: Extract favorability polls relevant to the candidates under consideration. This involves selecting polls within the specified time frame and ensuring they pertain to the candidates of interest. Filtering ensures that outdated or irrelevant data does not skew the analysis.
-
-2. **Normalization**:
-   - Ensure that the 'favorable' and 'unfavorable' percentages are correctly interpreted. If percentages are expressed as decimals (e.g., 0.45 instead of 45%), multiply them by 100 to convert them to standard percentage format.
-   - This step standardizes the data, preventing miscalculations due to inconsistent formatting.
-
-3. **Combined Weight Calculation**: Calculate the combined weight for each favorability poll using relevant weights such as the **Grade Weight**, **Transparency Weight**, and **Sample Size Weight**. Exclude weights that do not apply to favorability data, like the **State Rank Weight**, since favorability polls often reflect national sentiment rather than state-specific opinions.
-
-4. **Weighted Favorability Differential**:
-   - **Weighted Favorable Sum**:
-     $$
-     \text{Weighted Favorable Sum}_c = \sum_{i \in c} W_{\text{combined}, i} \times \text{Favorable}_i
-     $$
-     Where:
-     - \( W_{\text{combined}, i} \) is the combined weight for poll \( i \).
-     - \( \text{Favorable}_i \) is the favorable percentage for candidate \( c \) in poll \( i \).
-
-   - **Weighted Unfavorable Sum**:
-     $$
-     \text{Weighted Unfavorable Sum}_c = \sum_{i \in c} W_{\text{combined}, i} \times \text{Unfavorable}_i
-     $$
-     Where:
-     - \( \text{Unfavorable}_i \) is the unfavorable percentage for candidate \( c \) in poll \( i \).
-
    - **Total Weight**:
      $$
      \text{Total Weight}_c = \sum_{i \in c} W_{\text{combined}, i}
      $$
+5. **Weighted Average**:
+   $$
+   \text{Weighted Average}_c = \frac{\text{Weighted Sum}_c}{\text{Total Weight}_c}
+   $$
 
-   - **Favorability Differential**:
-     $$
-     \text{Favorability Differential}_c = \frac{\text{Weighted Favorable Sum}_c - \text{Weighted Unfavorable Sum}_c}{\text{Total Weight}_c}
-     $$
-     This formula calculates the net favorability by subtracting the weighted unfavorable responses from the weighted favorable responses and normalizing by the total combined weight.
+**Margin of Error Calculation**:
 
-**Justification**:
+- **Effective Sample Size**:
+  $$
+  n_{\text{effective}} = \sum_{i} W_{\text{combined}, i} \times n_i
+  $$
+- **Margin of Error**:
+  $$
+  \text{Margin of Error}_c = z \times \sqrt{\frac{p(1 - p)}{n_{\text{effective}}}} \times 100\%
+  $$
 
-- The favorability differential offers a more comprehensive measure of a candidate's public perception by balancing positive and negative sentiments. This is crucial because a candidate may have strong polling numbers but also high unfavorable ratings, which could impact their ability to mobilize support or sway undecided voters.
-- Weighting the favorability data ensures that more reliable polls (those with higher grades, transparency, and larger sample sizes) have a greater influence on the differential. This approach mirrors the weighting used in the polling metrics, promoting consistency and accuracy across the analysis.
-- Excluding weights like the State Rank Weight acknowledges that favorability polls typically reflect national rather than state-specific opinions. This ensures that the favorability differential accurately represents the candidates' overall public image without introducing irrelevant regional biases.
+  - **\( p \)**: Proportion (Weighted Average divided by 100).
+  - **\( z \)**: Z-score (default is 1.96 for 95% confidence).
 
-**Implementation**:
+### 10. Calculating Favorability Differential
 
-- Align the favorability data carefully with the candidates being analyzed, ensuring that all relevant polls are included and that the data is current.
-- Handle missing or incomplete data gracefully, perhaps by imputing missing values or excluding certain data points, to maintain the integrity of the analysis.
-- Use precise numerical methods for the calculations to ensure accuracy, especially when dealing with small differences between favorable and unfavorable percentages that could significantly impact the differential.
+**Objective**: To calculate a weighted favorability differential for each candidate, reflecting net public sentiment.
 
-By integrating the favorability differential into the overall analysis, the project gains a more nuanced understanding of each candidate's standing. This metric complements the polling metrics by providing additional context about the candidates' public images, which can be a significant factor in electoral success.
+**Methodology**:
+
+1. **Data Filtering**: Extract favorability polls relevant to the candidates.
+2. **Normalization**: Standardize 'favorable' and 'unfavorable' percentages.
+3. **Combined Weight Calculation**: Calculate weights relevant to favorability data.
+4. **Weighted Favorability Differential**:
+   $$
+   \text{Favorability Differential}_c = \frac{\text{Weighted Favorable Sum}_c - \text{Weighted Unfavorable Sum}_c}{\text{Total Weight}_c}
+   $$
 
 ### 11. Combining Polling Metrics and Favorability Differential
 
-In this section, we aim to produce a final adjusted result for each candidate by blending the weighted polling metrics with the favorability differential. The rationale behind this combination is to capture a more holistic view of each candidate's standing by considering not only the direct voting intentions reflected in the polls but also the broader public sentiment towards them. While polling metrics provide a snapshot of current electoral support, favorability ratings offer insights into the candidates' overall public image, which can influence future voting behavior and campaign dynamics.
+**Objective**: To produce a final adjusted result by blending the weighted polling metrics with the favorability differential.
 
-**Mathematical Formulation:**
-
-The combined result for each candidate \( c \) is calculated using a weighted average of the polling metric and the favorability differential:
+**Mathematical Formulation**:
 
 $$
 \text{Combined Result}_c = (1 - \alpha) \times \text{Polling Metric}_c + \alpha \times \text{Favorability Differential}_c
 $$
 
-Where:
-- \( \text{Polling Metric}_c \) is the weighted average percentage from the adjusted polling data for candidate \( c \).
-- \( \text{Favorability Differential}_c \) is the net favorability score for candidate \( c \), calculated as the difference between weighted favorable and unfavorable percentages.
-- \( \alpha \) is the **Favorability Weight**, a parameter between 0 and 1 that determines the influence of the favorability differential on the combined result.
+- **\( \alpha \)**: Favorability Weight (default is `0.15`).
 
-**Explanation:**
+**Implementation**:
 
-The parameter \( \alpha \) serves as a tuning knob that allows analysts to adjust the relative importance of favorability data in the final assessment. A higher value of \( \alpha \) increases the influence of favorability ratings, emphasizing the candidates' public image and potential for future support shifts. Conversely, a lower \( \alpha \) places more emphasis on the immediate voting intentions captured by polling metrics. By default, \( \alpha \) is set to `0.15` in `config.py`, indicating that favorability accounts for 15% of the combined result. This balance acknowledges that while current polling is a strong indicator of electoral outcomes, favorability can impact voter decisions, especially among undecided or swing voters.
-
-**Implementation Details:**
-
-To compute the combined result, both the polling metrics and favorability differentials must be calculated using consistent weighting methodologies as outlined in previous sections. The favorability differential for each candidate is obtained by subtracting the weighted unfavorable percentage from the weighted favorable percentage:
-
-$$
-\text{Favorability Differential}_c = \text{Weighted Favorable}_c - \text{Weighted Unfavorable}_c
-$$
-
-After obtaining both metrics, the combined result is calculated using the weighted average formula provided earlier. Adjustments to the favorability weight \( \alpha \) can be made in `config.py` or interactively via the Streamlit app, allowing users to explore how varying the influence of favorability affects the overall analysis. This flexibility is crucial for conducting sensitivity analyses and tailoring the model to different electoral contexts or research focuses.
-
-By thoughtfully combining these two metrics, the analysis provides a more nuanced and comprehensive view of each candidate's position, accounting for both current electoral support and overall public perception. This approach recognizes that elections are influenced not just by who voters intend to support at a given moment, but also by how favorably they view the candidates, which can affect turnout and voter engagement.
+- Adjust the `FAVORABILITY_WEIGHT` in `config.py` or via the Streamlit app.
+- Compute the final result for each candidate using the formula above.
 
 ### 12. Out-of-Bag (OOB) Variance Calculation
 
-In this project, a **Random Forest** model is utilized to estimate the variance associated with the polling metrics, specifically leveraging the **Out-of-Bag (OOB) error** for variance calculation. The Random Forest is an ensemble learning method that operates by constructing a multitude of decision trees during training and outputting the mean prediction of the individual trees. It inherently accounts for variance and bias, making it a robust choice for predictive modeling in the context of polling data analysis.
+**Objective**: To estimate the variance associated with the polling metrics using a Random Forest model.
 
-**Random Forests** work by creating multiple decision trees using bootstrap samples of the data, a process known as **bagging** (Bootstrap Aggregating). Each tree is trained on a random subset of the data with replacement, meaning some data points may appear multiple times in a single tree's training set, while others may not appear at all. The data not included in a tree's training set is referred to as **Out-of-Bag (OOB)** data for that tree. This unique aspect allows for an internal error estimation without the need for a separate validation dataset.
+**Methodology**:
 
-The **Out-of-Bag error** is calculated by aggregating the prediction errors for each data point using only the trees that did not have that particular data point in their bootstrap sample. For each observation, the model predicts the outcome using only the trees where that observation was not included in the training data. This method provides an unbiased estimate of the model's prediction error because the OOB samples are effectively a validation set that is independent of the training process for those trees.
+- **Random Forest Model**: Utilize the `RandomForestRegressor` with `oob_score=True`.
+- **OOB Variance**:
+  $$
+  \sigma_{\text{OOB}}^2 = \frac{1}{N} \sum_{i=1}^{N} \left( y_i - \hat{y}_i^{\text{OOB}} \right)^2
+  $$
+  - **\( y_i \)**: Actual value.
+  - **\( \hat{y}_i^{\text{OOB}} \)**: OOB prediction.
 
-In the script, the OOB variance is calculated using the predictions from the Random Forest model's `oob_prediction_` attribute. Specifically, the variance is computed as the mean squared difference between the actual values and the OOB predictions across all data points:
+**Justification**:
 
-$$
-\sigma_{\text{OOB}}^2 = \frac{1}{N} \sum_{i=1}^{N} \left( y_i - \hat{y}_i^{\text{OOB}} \right)^2
-$$
+- The OOB error provides an unbiased estimate of the model's prediction error.
+- Enhances the reliability of the analysis by quantifying uncertainty.
 
-Where:
-- \( N \) is the total number of samples.
-- \( y_i \) is the actual observed value for the \( i \)-th sample.
-- \( \hat{y}_i^{\text{OOB}} \) is the OOB prediction for the \( i \)-th sample.
-
-This approach simplifies the variance estimation process and enhances accuracy by utilizing all available data efficiently. It eliminates the need to set aside a portion of the data solely for validation purposes, which is particularly beneficial when the dataset is not exceedingly large. By leveraging the OOB error, the model can provide reliable estimates of prediction variance, which is critical for understanding the uncertainty associated with the adjusted polling metrics.
-
-The use of Random Forests and OOB variance in this script offers several advantages:
-- **Robustness**: Random Forests are less prone to overfitting due to the ensemble of de-correlated trees.
-- **Internal Error Estimation**: The OOB error provides an unbiased estimate of the model's prediction error without requiring a separate validation set.
-- **Efficiency**: Maximizes the use of available data for both training and validation.
-- **Interpretability**: The variance estimates help in quantifying the uncertainty in the predictions, aiding in more informed decision-making based on the analysis.
-
-By incorporating the OOB variance calculation, the script enhances the reliability of the polling analysis, providing not only adjusted poll results but also an understanding of the confidence that can be placed in these results. This methodological choice underscores the project's commitment to statistical rigor and the accurate representation of uncertainty in electoral forecasting.
+---
 
 ## Error Handling and Normalization
 
@@ -744,7 +541,12 @@ All configuration parameters are centralized in `config.py` and can be adjusted 
   ```python
   TIME_DECAY_WEIGHT_MULTIPLIER = 1.0
   SAMPLE_SIZE_WEIGHT_MULTIPLIER = 1.0
-  # ... other multipliers
+  NORMALIZED_NUMERIC_GRADE_MULTIPLIER = 1.0
+  NORMALIZED_POLLSCORE_MULTIPLIER = 1.0
+  NORMALIZED_TRANSPARENCY_SCORE_MULTIPLIER = 1.0
+  POPULATION_WEIGHT_MULTIPLIER = 1.0
+  PARTISAN_WEIGHT_MULTIPLIER = 1.0
+  STATE_RANK_MULTIPLIER = 1.0
   ```
 
 - **Favorability Weight**:
@@ -801,11 +603,12 @@ All configuration parameters are centralized in `config.py` and can be adjusted 
 
 ## Conclusion
 
-By meticulously integrating multiple data sources and applying a comprehensive set of weighting factors, this project offers a detailed and accurate analysis of presidential polling data. The consideration of factors such as pollster quality, sample size, partisanship, population type, and state significance ensures that the adjusted poll results provide a realistic reflection of the electoral landscape.
+By meticulously integrating multiple data sources and applying a comprehensive set of weighting factors—including the enhanced State Rank Weight that incorporates current forecasts—this project offers a detailed and accurate analysis of presidential polling data. The consideration of factors such as pollster quality, sample size, partisanship, population type, and state significance ensures that the adjusted poll results provide a realistic reflection of the electoral landscape.
 
 **Key Strengths**:
 
 - **Robust Methodology**: The use of mathematical models and justifiable weighting mechanisms enhances the credibility of the analysis.
+- **Incorporation of Current Forecasts**: By integrating FiveThirtyEight's forecast data into the State Rank Weight, the model stays updated with the latest electoral dynamics.
 - **Customizability**: Users can adjust parameters to explore different analytical perspectives or to align with specific research questions.
 - **Interactivity**: The Streamlit app provides a user-friendly interface, making the analysis accessible to a broader audience.
 
