@@ -301,7 +301,7 @@ def configuration_form():
         
         st.markdown("<sup>Adjust the configuration weights for the polling analysis.</sup>", unsafe_allow_html=True)
         with st.form("config_form"):
-            favorability_weight = st.slider("Favorability Weight", 0.0, 1.0, float(config.FAVORABILITY_WEIGHT), 0.01)
+            favorability_weight = st.slider("Favorability Weight", 0.01, 1.0, float(config.FAVORABILITY_WEIGHT), 0.01)
             heavy_weight = st.checkbox("Heavy Weight", config.HEAVY_WEIGHT)
             st.markdown("<sup>Check for multiplicative, uncheck for additive.</sup>", unsafe_allow_html=True)
             
@@ -381,14 +381,14 @@ def configuration_form():
             )
             
             st.subheader("Weight Multipliers")
-            time_decay_weight_multiplier = st.slider("Time Decay Weight Multiplier", 0.0, 2.0, float(config.TIME_DECAY_WEIGHT_MULTIPLIER), 0.1)
-            sample_size_weight_multiplier = st.slider("Sample Size Weight Multiplier", 0.0, 2.0, float(config.SAMPLE_SIZE_WEIGHT_MULTIPLIER), 0.1)
-            normalized_numeric_grade_multiplier = st.slider("Numeric Grade Multiplier", 0.0, 2.0, float(config.NORMALIZED_NUMERIC_GRADE_MULTIPLIER), 0.1)
-            normalized_pollscore_multiplier = st.slider("Poll Score Multiplier", 0.0, 2.0, float(config.NORMALIZED_POLLSCORE_MULTIPLIER), 0.1)
-            normalized_transparency_score_multiplier = st.slider("Transparency Score Multiplier", 0.0, 2.0, float(config.NORMALIZED_TRANSPARENCY_SCORE_MULTIPLIER), 0.1)
-            population_weight_multiplier = st.slider("Population Weight Multiplier", 0.0, 2.0, float(config.POPULATION_WEIGHT_MULTIPLIER), 0.1)
-            partisan_weight_multiplier = st.slider("Partisan Weight Multiplier", 0.0, 2.0, float(config.PARTISAN_WEIGHT_MULTIPLIER), 0.1)
-            state_rank_multiplier = st.slider("State Rank Multiplier", 0.0, 2.0, float(config.STATE_RANK_MULTIPLIER), 0.1)
+            time_decay_weight_multiplier = st.slider("Time Decay Weight Multiplier", 0.01, 2.0, float(config.TIME_DECAY_WEIGHT_MULTIPLIER), 0.1)
+            sample_size_weight_multiplier = st.slider("Sample Size Weight Multiplier", 0.01, 2.0, float(config.SAMPLE_SIZE_WEIGHT_MULTIPLIER), 0.1)
+            normalized_numeric_grade_multiplier = st.slider("Numeric Grade Multiplier", 0.01, 2.0, float(config.NORMALIZED_NUMERIC_GRADE_MULTIPLIER), 0.1)
+            normalized_pollscore_multiplier = st.slider("Poll Score Multiplier", 0.01, 2.0, float(config.NORMALIZED_POLLSCORE_MULTIPLIER), 0.1)
+            normalized_transparency_score_multiplier = st.slider("Transparency Score Multiplier", 0.01, 2.0, float(config.NORMALIZED_TRANSPARENCY_SCORE_MULTIPLIER), 0.1)
+            population_weight_multiplier = st.slider("Population Weight Multiplier", 0.01, 2.0, float(config.POPULATION_WEIGHT_MULTIPLIER), 0.1)
+            partisan_weight_multiplier = st.slider("Partisan Weight Multiplier", 0.01, 2.0, float(config.PARTISAN_WEIGHT_MULTIPLIER), 0.1)
+            state_rank_multiplier = st.slider("State Rank Multiplier", 0.01, 2.0, float(config.STATE_RANK_MULTIPLIER), 0.1)
             
             force_refresh = st.checkbox("Force Refresh Data", False)
             
