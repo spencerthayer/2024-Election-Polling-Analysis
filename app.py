@@ -521,6 +521,13 @@ def main():
     st.markdown(f"[Download Polling Data CSV]({POLLING_URL})")
     st.markdown(f"[Download Favorability Data CSV]({FAVORABILITY_URL})")
 
+    # Embed and render readme.md
+    st.header("Project Documentation")
+    readme_path = os.path.join(os.path.dirname(__file__), 'readme.md')
+    with open(readme_path, 'r') as readme_file:
+        readme_content = readme_file.read()
+        st.markdown(readme_content, unsafe_allow_html=True)
+
     # Footer
     st.markdown("---")
     st.write(f"Developed by Spencer Thayer. Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
