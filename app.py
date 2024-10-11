@@ -88,6 +88,14 @@ def save_cached_config(config_dict):
     except Exception as e:
         st.error(f"Error saving cached configuration: {e}")
 
+def clear_config_cache():
+    """Clear the cached configuration file."""
+    if os.path.exists(CACHED_CONFIG_FILE):
+        os.remove(CACHED_CONFIG_FILE)
+        st.success("Configuration cache cleared. Default values will be used.")
+    else:
+        st.info("No cached configuration found.")
+
 # Update the load_and_process_data function to use caching
 @st.cache_data
 def load_and_process_data(config_vars, force_refresh=False):
@@ -198,7 +206,7 @@ def create_differential_bar_chart(df: pd.DataFrame):
 
     max_abs_diff = max(abs(df['differential'].min()), abs(df['differential'].max()))
     max_moe = max(df['harris_moe'].max(), df['trump_moe'].max())
-    y_range = max(max_abs_diff, max_moe) + 0
+    y_range = max(max_abs_diff, max_moe) + 0.5
     y_min, y_max = -y_range, y_range
 
     base = alt.Chart(df).encode(
@@ -231,7 +239,6 @@ def create_differential_bar_chart(df: pd.DataFrame):
         y=alt.Y('zero:Q'),
         y2=alt.Y2('low:Q')
     ).transform_calculate(
-        # zero='datum.trump_moe*((100-(datum.differential*10))*.01)*1 + (datum.oob_variance * 0.5)',
         zero='datum.trump_moe*((100-(datum.differential*10))*.01)*1',
         low='datum.trump_moe*-1'
     )
@@ -284,7 +291,14 @@ def create_differential_bar_chart(df: pd.DataFrame):
 
 def configuration_form():
     with st.sidebar:
-        st.header("Polling Configuration")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.header("Polling Configuration")
+        with col2:
+            if st.button("⟲",help="Reset to default configuration"):
+                clear_config_cache()
+                st.rerun()
+        
         st.markdown("<sup>Adjust the configuration weights for the polling analysis.</sup>", unsafe_allow_html=True)
         with st.form("config_form"):
             favorability_weight = st.slider("Favorability Weight", 0.0, 1.0, float(config.FAVORABILITY_WEIGHT), 0.01)
@@ -413,6 +427,22 @@ def main():
     """
     # Set up the Streamlit page configuration
     st.set_page_config(page_title="Election Polling Analysis", layout="wide")
+    
+    # Custom CSS to style the button (place this after set_page_config)
+    st.markdown("""
+    <style>
+        button.ef3psqc16,
+        button.ef3psqc16
+        div.e1nzilvr5
+        p {
+            font-size: 32px !important;
+            line-height: 0px !important;
+            border: none !important;
+            background: none !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.title("Election Polling Analysis")
     
     # Configuration form

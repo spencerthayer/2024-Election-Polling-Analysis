@@ -4,3 +4,5 @@
 /resources
 *.csv
 .streamlit.pid
+
+data/config.json

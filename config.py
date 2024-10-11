@@ -22,11 +22,11 @@ FAVORABILITY_WEIGHT = 0.15  # Adjust this value between 0 (no favorability influ
 HEAVY_WEIGHT = True  # Set to True to use multiplicative weighting, False for additive weighting
 
 # Time decay parameters
-DECAY_RATE = 1     # Decay rate for time decay weighting (e.g., 0.5 for a slow 50% decay use 2 for a faster 200% decay)
+DECAY_RATE = 1.0     # Decay rate for time decay weighting (e.g., 0.5 for a slow 50% decay use 2 for a faster 200% decay)
 HALF_LIFE_DAYS = 14  # Half-life in days for time decay weighting
 
 # Minimum number of samples required for analysis
-MIN_SAMPLES_REQUIRED = 2 # Minimum number of data points required to perform analysis for a period
+MIN_SAMPLES_REQUIRED = 4 # Minimum number of data points required to perform analysis for a period
 
 ZERO_CORRECTION = 0.0001  # Small value to prevent division by zero in calculations
 
@@ -54,7 +54,7 @@ POPULATION_WEIGHTS = {
     'rv':  0.75, # Registered voters
     'v':   0.5,  # Voters (general)
     'a':   0.25, # Adults
-    'all': 0.1   # All respondents
+    'all': 0.01  # All respondents
 }
 
 # Coloring constants for visualizations
