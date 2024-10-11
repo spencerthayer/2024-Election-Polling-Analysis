@@ -118,27 +118,37 @@ $$
 
 ### 6. Population Weight
 
-Polls targeting different population types are weighted accordingly:
+Polls targeting different population types are weighted according to their likelihood of participation in elections. Each category reflects a different level of engagement and probability of voting, which impacts how heavily their opinions are weighted in analyses:
 
-- Likely voters (lv): 1.0
-- Registered voters (rv): \( \frac{2}{3} \) or approximately 0.6667
-- Voters (v): 0.5
-- Adults (a): \( \frac{1}{3} \) or approximately 0.3333
-- All: \( \frac{1}{3} \) or approximately 0.3333
+- **Likely Voters (lv): 1.0**  
+  These are individuals who have a high probability of voting based on past behavior and current intent. Their opinions are weighted most heavily as they represent the group most likely to influence election outcomes.
 
-This can be expressed as:
+- **Registered Voters (rv): 0.75**  
+  This group consists of individuals who are registered to vote but may not always participate in every election. They are weighted less heavily than likely voters but still carry significant weight due to their potential to vote.
+
+- **Past Voters (v): 0.5**  
+  These are individuals who have voted in past elections but may not be as consistently active in the voting process as likely or registered voters. Their weight reflects a moderate level of influence on expected election outcomes.
+
+- **Eligible Voters (a): 0.25**  
+  This category includes all individuals who are eligible to vote, regardless of whether they are registered. Their weight is lower, reflecting the uncertainty around whether they will actually participate in the voting process.
+
+- **All Respondents (all): 0.1**  
+  This category includes everyone who responds to the poll, regardless of their eligibility or likelihood of voting. It can include people who are not registered or eligible to vote, or who have little intention of participating in the upcoming elections. In this context, it represents a broad cross-section of opinions, but because many in this category are unlikely to directly impact the election outcomes, their responses are given a lower weight.
+
+This can be expressed mathematically as:
 
 $$
 W_{\text{population}}(P) =
 \begin{cases}
 1.0, & \text{if } P = \text{lv} \\
-0.6667, & \text{if } P = \text{rv} \\
+0.75, & \text{if } P = \text{rv} \\
 0.5, & \text{if } P = \text{v} \\
-0.3333, & \text{if } P = \text{a or all}
+0.25, & \text{if } P = \text{a} \\
+0.1, & \text{if } P = \text{all}
 \end{cases}
 $$
 
-Where \( P \) represents the population type of the poll.
+Where \( P \) represents the population type of the poll. The weights can be adjusted dynamically through the interface to reflect varying importance based on current political climates and polling needs. The "All Respondents" category, while not directly indicative of voter behavior, provides insights into broader public sentiment, even if those opinions may not translate into votes. The weightings make sense if the primary goal is to predict election outcomes accurately, as they prioritize the opinions of those most likely to vote. However, they may seem unfair if the aim is to measure public sentiment more broadly. Adjusting the weights in different contexts can provide a more balanced view and ensure that the analysis is tailored to its intended purpose. Ultimately, the "fairness" depends on the clarity and transparency about why certain groups are weighted as they are and how the results will be used.
 
 ### 7. State Rank Weight
 

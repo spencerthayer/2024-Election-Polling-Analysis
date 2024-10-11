@@ -358,7 +358,7 @@ def configuration_form():
                 format="%.3f"
             )
             all_weight = st.number_input(
-                "Unlikely Voters",
+                "All Respondents",
                 min_value=0.000, 
                 max_value=1.000, 
                 value=float(config.POPULATION_WEIGHTS['all']), 

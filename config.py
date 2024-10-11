@@ -44,17 +44,17 @@ FAVORABILITY_URL = "https://projects.fivethirtyeight.com/polls-page/data/favorab
 
 # Partisan weight mapping
 PARTISAN_WEIGHT = {
-    True: 0.001,  # Apply a reduced weight to partisan polls
-    False: 1.0  # Apply full weight to non-partisan polls
+    True:  0.01, # Apply a reduced weight to partisan polls
+    False: 1.0   # Apply full weight to non-partisan polls
 }
 
 # Population weights mapping
 POPULATION_WEIGHTS = {
-    'lv': 1.0,      # Likely voters
-    'rv': 0.75,     # Registered voters
-    'v': 0.5,       # Voters (general)
-    'a': 0.25,      # Adults
-    'all': 0.1     # All respondents
+    'lv':  1.0,  # Likely voters
+    'rv':  0.75, # Registered voters
+    'v':   0.5,  # Voters (general)
+    'a':   0.25, # Adults
+    'all': 0.1   # All respondents
 }
 
 # Coloring constants for visualizations
