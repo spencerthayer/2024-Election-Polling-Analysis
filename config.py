@@ -16,7 +16,7 @@ PARTISAN_WEIGHT_MULTIPLIER = 1.0
 STATE_RANK_MULTIPLIER = 1.0
 
 # Weight given to favorability in the combined analysis (between 0 and 1)
-FAVORABILITY_WEIGHT = 0.15  # Adjust this value between 0 (no favorability influence) and 1 (only favorability)
+FAVORABILITY_WEIGHT = 0.1  # Adjust this value between 0 (no favorability influence) and 1 (only favorability)
 
 # Flag to control weighting strategy (True for multiplicative, False for additive)
 HEAVY_WEIGHT = True  # Set to True to use multiplicative weighting, False for additive weighting

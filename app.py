@@ -192,7 +192,7 @@ def create_line_chart(df: pd.DataFrame, y_columns: list, title: str):
 def create_differential_bar_chart(df: pd.DataFrame):
     """
     Creates a differential bar chart using Altair with the formatting from version 1.
-    Includes OOB variance in the tooltip but doesn't modify the existing calculations.
+    Includes OOB variance in the tooltip and adds a simple key at the bottom.
 
     Args:
         df (pd.DataFrame): DataFrame containing the data to plot.
@@ -275,16 +275,47 @@ def create_differential_bar_chart(df: pd.DataFrame):
         )
     )
 
-    final_chart = alt.layer(
-        trump_moe_area,
-        harris_moe_area,
-        bars,
-        zero_line,
-        text_labels
-    ).properties(
-        title="Differential Between Harris and Trump Over Time",
-        width=800,
-        height=400
+    # Create a DataFrame for the key
+    key_data = pd.DataFrame({
+        'label': ['Harris Lead', 'Harris MOE', 'Trump Lead', 'Trump MOE'],
+        'color': [HARRIS_COLOR, HARRIS_COLOR_LIGHT, TRUMP_COLOR, TRUMP_COLOR_LIGHT],
+        'x': [0, 0, 1, 1],
+        'y': [0, 1, 0, 1]
+    })
+
+    # Create the key chart
+    key_chart = alt.Chart(key_data).mark_circle(size=60).encode(
+        x=alt.X('x:O', axis=None, scale=alt.Scale(domain=[0, 1])),
+        y=alt.Y('y:O', axis=None, scale=alt.Scale(domain=[0, 1])),
+        color=alt.Color('color:N', scale=None)
+    ).properties(width=800, height=30)
+
+    # Create labels for the key
+    key_labels = alt.Chart(key_data).mark_text(
+        align='left',
+        baseline='middle',
+        dx=15,
+        fontSize=12
+    ).encode(
+        x=alt.X('x:O', axis=None, scale=alt.Scale(domain=[0, 1])),
+        y=alt.Y('y:O', axis=None, scale=alt.Scale(domain=[0, 1])),
+        text='label'
+    ).properties(width=800, height=30)
+
+    # Combine the main chart with the key
+    final_chart = alt.vconcat(
+        alt.layer(
+            trump_moe_area,
+            harris_moe_area,
+            bars,
+            zero_line,
+            text_labels
+        ).properties(
+            title="Differential Between Harris and Trump Over Time",
+            width=800,
+            height=400
+        ),
+        (key_chart + key_labels).properties()
     )
 
     st.altair_chart(final_chart, use_container_width=True)
