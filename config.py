@@ -26,13 +26,13 @@ DECAY_RATE = 1.0     # Decay rate for time decay weighting (e.g., 0.5 for a slow
 HALF_LIFE_DAYS = 14  # Half-life in days for time decay weighting
 
 # Minimum number of samples required for analysis
-MIN_SAMPLES_REQUIRED = 4 # Minimum number of data points required to perform analysis for a period
+MIN_SAMPLES_REQUIRED = 2 # Minimum number of data points required to perform analysis for a period
 
 ZERO_CORRECTION = 0.0001  # Small value to prevent division by zero in calculations
 
 # Random Forest parameters
-N_TREES = 1000       # Number of trees in the Random Forest
-RANDOM_STATE = 42    # Random state for reproducibility
+N_TREES = 500       # Number of trees in the Random Forest
+RANDOM_STATE = 25    # Random state for reproducibility
 
 # Logging configuration
 LOGGING_LEVEL = logging.INFO  # Set logging level (e.g., DEBUG, INFO, WARNING, ERROR, CRITICAL)
