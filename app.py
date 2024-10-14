@@ -206,7 +206,7 @@ def create_differential_bar_chart(df: pd.DataFrame):
 
     max_abs_diff = max(abs(df['differential'].min()), abs(df['differential'].max()))
     max_moe = max(df['harris_moe'].max(), df['trump_moe'].max())
-    y_range = max(max_abs_diff, max_moe) + 0.5
+    y_range = max(max_abs_diff, max_moe) + 0.1
     y_min, y_max = -y_range, y_range
 
     base = alt.Chart(df).encode(
@@ -239,7 +239,7 @@ def create_differential_bar_chart(df: pd.DataFrame):
         y=alt.Y('zero:Q'),
         y2=alt.Y2('low:Q')
     ).transform_calculate(
-        zero='datum.trump_moe*((100-(datum.differential*10))*.01)*1',
+        zero='(datum.trump_moe+(datum.trump_moe * (datum.oob_variance / 100)))*((100-(datum.differential*10))*.01)*1',
         low='datum.trump_moe*-1'
     )
 
@@ -250,7 +250,7 @@ def create_differential_bar_chart(df: pd.DataFrame):
         y=alt.Y('zero:Q'),
         y2=alt.Y2('high:Q')
     ).transform_calculate(
-        zero='datum.harris_moe*((100-(datum.differential*10))*.01)*-1',
+        zero='(datum.harris_moe+(datum.harris_moe * (datum.oob_variance / 100)))*((100-(datum.differential*10))*.01)*-1',
         high='datum.harris_moe'
     )
 
