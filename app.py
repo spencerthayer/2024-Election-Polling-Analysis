@@ -239,8 +239,12 @@ def create_differential_bar_chart(df: pd.DataFrame):
         y=alt.Y('zero:Q'),
         y2=alt.Y2('low:Q')
     ).transform_calculate(
-        zero='(datum.trump_moe+(datum.trump_moe * (datum.oob_variance / 100)))*((100-(datum.differential*10))*.01)*1',
-        low='datum.trump_moe*-1'
+        oob = '( datum.oob_variance / 100 )',
+        dif = '( datum.differential / 10 )'
+    ).transform_calculate(
+        # zero='(datum.trump_moe+(datum.trump_moe * (datum.oob_variance / 100)))*((100-(datum.differential*10))*.01)*1',
+        zero='( ( datum.trump_moe - datum.differential ) + ( datum.trump_moe * datum.oob *-1 ) )  *1',
+        low='( datum.trump_moe ) *-1'
     )
 
     harris_moe_area = base.mark_area(
@@ -250,8 +254,12 @@ def create_differential_bar_chart(df: pd.DataFrame):
         y=alt.Y('zero:Q'),
         y2=alt.Y2('high:Q')
     ).transform_calculate(
-        zero='(datum.harris_moe+(datum.harris_moe * (datum.oob_variance / 100)))*((100-(datum.differential*10))*.01)*-1',
-        high='datum.harris_moe'
+        oob = '( datum.oob_variance / 100 )',
+        dif = '( datum.differential / 10 )'
+    ).transform_calculate(
+        # zero='(datum.harris_moe+(datum.harris_moe * (datum.oob_variance / 100)))*((100-(datum.differential*10))*.01)*-1',
+        zero='( ( datum.harris_moe - datum.differential ) + ( datum.harris_moe * datum.oob *1 ) )  *-1',
+        high='( datum.harris_moe )'
     )
 
     zero_line = alt.Chart(pd.DataFrame({'y': [0]})).mark_rule(
