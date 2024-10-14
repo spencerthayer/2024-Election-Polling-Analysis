@@ -343,77 +343,22 @@ def configuration_form():
             st.subheader("Time Weight")
             half_life_days = st.number_input("Half Life in Days", 1, 365, int(config.HALF_LIFE_DAYS), 1)
             st.markdown("<sup>Time decay parameter that controls the influence of older polls.</sup>", unsafe_allow_html=True)
-            decay_rate = st.number_input(
-                "Decay Rate", 
-                min_value=0.001, 
-                max_value=10.000, 
-                value=float(config.DECAY_RATE), 
-                step=0.001,
-                format="%.3f"
-            )
+            decay_rate = st.slider("Decay Rate", 0.01, 2.000, float(config.DECAY_RATE), 0.1)
             st.markdown("<sup>The rate at which older polls lose influence.</sup>", unsafe_allow_html=True)
-            min_samples_required = st.number_input("Minimum Samples Required", 1, 100, int(config.MIN_SAMPLES_REQUIRED), 1)
+            # min_samples_required = st.number_input("Minimum Samples Required", 1, 100, int(config.MIN_SAMPLES_REQUIRED), 1)
+            min_samples_required = st.slider("Minimum Samples Required", 2, 10, int(config.MIN_SAMPLES_REQUIRED), 2)
             st.markdown("<sup>The minimum number of samples required to perform analysis for a period.</sup>", unsafe_allow_html=True)
             
             st.subheader("Partisan Polling Weight")
-            partisan_weight_true = st.number_input(
-                "Partisan Polls Weight", 
-                min_value=0.000, 
-                max_value=1.000, 
-                value=float(config.PARTISAN_WEIGHT[True]), 
-                step=0.001,
-                format="%.3f"
-            )
-            partisan_weight_false = st.number_input(
-                "Non-Partisan Polls Weight", 
-                min_value=0.000, 
-                max_value=1.000, 
-                value=float(config.PARTISAN_WEIGHT[False]), 
-                step=0.001,
-                format="%.3f"
-            )
-            
+            partisan_weight_true = st.slider("Partisan Polls Weight", 0.01, 1.0, float(config.PARTISAN_WEIGHT[True]), 0.01)
+            partisan_weight_false = st.slider("Non-Partisan Polls Weight", 0.01, 1.0, float(config.PARTISAN_WEIGHT[False]), 0.01)
+
             st.subheader("Voter Weights")
-            lv_weight = st.number_input(
-                "Likely Voters", 
-                min_value=0.000, 
-                max_value=1.000, 
-                value=float(config.POPULATION_WEIGHTS['lv']), 
-                step=0.001,
-                format="%.3f"
-            )
-            rv_weight = st.number_input(
-                "Registered Voters", 
-                min_value=0.000, 
-                max_value=1.000, 
-                value=float(config.POPULATION_WEIGHTS['rv']), 
-                step=0.001,
-                format="%.3f"
-            )
-            v_weight = st.number_input(
-                "Past Voters", 
-                min_value=0.000, 
-                max_value=1.000, 
-                value=float(config.POPULATION_WEIGHTS['v']), 
-                step=0.001,
-                format="%.3f"
-            )
-            a_weight = st.number_input(
-                "Eligible Voters", 
-                min_value=0.000, 
-                max_value=1.000, 
-                value=float(config.POPULATION_WEIGHTS['a']), 
-                step=0.001,
-                format="%.3f"
-            )
-            all_weight = st.number_input(
-                "All Respondents",
-                min_value=0.000, 
-                max_value=1.000, 
-                value=float(config.POPULATION_WEIGHTS['all']), 
-                step=0.001,
-                format="%.3f"
-            )
+            lv_weight = st.slider("Likely Voters", 0.01, 1.0, float(config.POPULATION_WEIGHTS['lv']), 0.01)
+            rv_weight = st.slider("Registered Voters", 0.01, 1.0, float(config.POPULATION_WEIGHTS['rv']), 0.01)
+            v_weight = st.slider("Past Voters", 0.01, 1.0, float(config.POPULATION_WEIGHTS['v']), 0.01)
+            a_weight = st.slider("Eligible Voters", 0.01, 1.0, float(config.POPULATION_WEIGHTS['a']), 0.01)
+            all_weight = st.slider("All Respondents", 0.01, 1.0, float(config.POPULATION_WEIGHTS['all']), 0.01)
             
             st.subheader("Weight Multipliers")
             time_decay_weight_multiplier = st.slider("Time Decay Weight Multiplier", 0.01, 2.0, float(config.TIME_DECAY_WEIGHT_MULTIPLIER), 0.1)
