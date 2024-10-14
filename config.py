@@ -67,9 +67,9 @@ HARRIS_COLOR_LIGHT = "#6495ED"
 
 # Period order for analysis (used in visualizations and sorting)
 PERIOD_ORDER = [
-    '12 months',
-    '6 months',
-    '5 months',
+    # '12 months',
+    # '6 months',
+    # '5 months',
     '4 months',
     '3 months',
     '2 months',
