@@ -97,10 +97,10 @@ To adjust raw polling data and produce a more accurate reflection of the elector
 
 **Mathematical Formulation**:
 
-The weight decreases exponentially with the age of the poll:
+The weight decreases exponentially with the age of the poll using NumPy's exponential function:
 
 $$
-W_{\text{time decay}} = e^{-\lambda t}
+W_{\text{time decay}} = \exp\left(-\lambda t\right)
 $$
 
 - **\( t \)**: The age of the poll in fractional days.
@@ -140,7 +140,8 @@ $$
 The normalized grade weight is calculated as:
 
 $$
-W_{\text{grade}} = \frac{\text{Numeric Grade}}{\text{Max Numeric Grade}}
+W_{\text{grade}} = \frac{\text{Numeric Grade}}{\text{Max Numeric Grade}} \\
+W_{\text{grade}} = \text{clip}(W_{\text{grade}}, 0, 1)
 $$
 
 - **Numeric Grade**: A numerical representation of the pollster's grade assigned by FiveThirtyEight.
@@ -158,6 +159,7 @@ $$
 **Implementation**:
 
 - Ensure that the grades are properly converted to numeric values, handling any non-standard grades or missing values.
+- The normalized grade is clipped to ensure it remains within the [0, 1] range using Pandas' `clip()` function.
 
 ### 3. Transparency Weight
 
@@ -166,7 +168,8 @@ $$
 **Mathematical Formulation**:
 
 $$
-W_{\text{transparency}} = \frac{\text{Transparency Score}}{\text{Max Transparency Score}}
+W_{\text{transparency}} = \frac{\text{Transparency Score}}{\text{Max Transparency Score}} \\
+W_{\text{transparency}} = \text{clip}(W_{\text{transparency}}, 0, 1)
 $$
 
 - **Transparency Score**: A score provided by FiveThirtyEight that reflects the level of methodological disclosure by the pollster.
@@ -181,6 +184,11 @@ $$
 
 - If `Max Transparency Score` is zero, `ZERO_CORRECTION` is used to prevent division by zero.
 
+**Implementation**:
+
+- Convert transparency scores to numeric values and handle any non-standard or missing values.
+- Normalize and clip the transparency scores to maintain consistency.
+
 ### 4. Sample Size Weight
 
 **Objective**: To account for the reliability of polls based on the number of respondents.
@@ -192,7 +200,7 @@ W_{\text{sample size}} = \frac{\text{Sample Size} - \text{Min Sample Size}}{\tex
 $$
 
 - **Sample Size**: The number of respondents in the poll.
-- **Min Sample Size** and **Max Sample Size**: The minimum and maximum sample sizes across all polls.
+- **Min Sample Size** and **Max Sample Size**: The minimum and maximum sample sizes across all polls, determined using Pandas' `min()` and `max()` functions.
 
 **Justification**:
 
@@ -202,6 +210,11 @@ $$
 **Error Handling**:
 
 - If `Max Sample Size - Min Sample Size` is zero, `ZERO_CORRECTION` is used.
+
+**Implementation**:
+
+- Calculate the minimum and maximum sample sizes using Pandas' `min()` and `max()` functions.
+- Normalize the sample sizes and handle cases where all sample sizes are identical.
 
 ### 5. Partisan Weight
 
@@ -219,7 +232,9 @@ $$
 
 **Default Values in `config.py`**:
 
-- `PARTISAN_WEIGHT = {True: 0.01, False: 1.0}`
+```python
+PARTISAN_WEIGHT = {True: 0.01, False: 1.0}
+```
 
 **Justification**:
 
@@ -228,6 +243,7 @@ $$
 
 **Implementation**:
 
+- Weights are assigned using a dictionary lookup for efficiency.
 - The weight values can be adjusted in `config.py` or via the Streamlit app to reflect the desired level of influence from partisan polls.
 
 ### 6. Population Weight
@@ -248,11 +264,12 @@ $$
 
 - **Likely Voters** are most representative of the actual electorate, so they receive the highest weight.
 - **Registered Voters** are somewhat less predictive, as not all registered voters turn out.
-- **Adults** and **All Respondents** include individuals who may not be eligible or likely to vote, so they receive lower weights.
+- **Voters** and **Adults** include individuals who may not be eligible or likely to vote, so they receive lower weights.
+- **All Respondents** include the broadest population, many of whom may not be eligible or likely to vote, thus receiving the lowest weight.
 
 **Implementation**:
 
-- These weights can be adjusted to reflect changes in voter behavior or to conduct sensitivity analyses.
+- These weights are assigned using a dictionary and can be adjusted in `config.py` or via the Streamlit app to reflect changes in voter behavior or to conduct sensitivity analyses.
 
 ### 7. State Rank Weight
 
@@ -279,8 +296,8 @@ Where:
 1. **Pro Status Value (40% of State Rank)**:
    - Derived from the state's political classification:
      - `T`: Toss-up state (0.8)
-     - `D1`, `R1`: Tilts Democrat/Republican (0.6)
-     - `D2`, `R2`: Leans Democrat/Republican (0.4)
+     - `D1`, `R1`: Tilt Democrat/Republican (0.6)
+     - `D2`, `R2`: Lean Democrat/Republican (0.4)
      - `D3`, `R3`: Likely Democrat/Republican (0.2)
      - `D4`, `R4`: Safe Democrat/Republican (0.1)
    - **Justification**: Reflects the competitiveness of the state based on historical and current political leanings, with higher values for more competitive states.
@@ -312,16 +329,21 @@ Where:
 - **Incorporation into Combined Weight**:
   - The State Rank Weight is included as one of the factors in the combined weight calculation (see [Combining Weights](#8-combining-weights)).
   - Its influence can be adjusted using the `STATE_RANK_MULTIPLIER` in `config.py`:
+
     ```python
     STATE_RANK_MULTIPLIER = 1.0  # Adjust to increase or decrease influence
     ```
+
+**Handling Missing Forecast Data**:
+
+- If forecast data for a state is missing, a default forecast weight is applied to prevent computational errors.
 
 **Considerations**:
 
 - **Dynamic Political Landscape**:
   - The state's `pro_status` and forecast data are regularly updated to reflect the most current information.
 - **Data Handling**:
-  - If forecast data is missing for a state, a default value is used to prevent computational errors.
+  - The `states.py` script ensures that if forecast data is missing or incomplete, default values are used to maintain computational integrity.
 - **Weight Sensitivity**:
   - The weighting percentages (40%, 30%, 30%) can be adjusted to emphasize different components based on analytical needs.
 
@@ -366,6 +388,8 @@ An essential step in the analysis is to aggregate the individual weights calcula
    - **Cons**:
      - Can overly penalize polls with minor weaknesses.
 
+   *Implementation Note*: Utilizes NumPy's `prod()` function for efficient computation.
+
 2. **Additive Combination** (when `HEAVY_WEIGHT = False`):
 
    $$
@@ -377,6 +401,8 @@ An essential step in the analysis is to aggregate the individual weights calcula
      - More forgiving of polls with mixed strengths and weaknesses.
    - **Cons**:
      - May allow lower-quality polls to have more influence than desired.
+
+   *Implementation Note*: Utilizes NumPy's `mean()` function to calculate the average of weighted components.
 
 **Multipliers**:
 
@@ -398,7 +424,11 @@ STATE_RANK_MULTIPLIER = 1.0
 1. **Calculate Individual Weights**: Compute each weight as described in the previous sections.
 2. **Apply Multipliers**: Multiply each weight by its corresponding multiplier.
 3. **Combine Weights**: Use the chosen method (multiplicative or additive) to compute the combined weight.
-4. **Normalize Combined Weights** (Optional): Ensure combined weights are on a consistent scale.
+4. **Normalization** (Optional): Ensure combined weights are on a consistent scale.
+
+**Example**:
+
+If `HEAVY_WEIGHT` is set to `True`, the combined weight for a poll would be the product of all individual weights multiplied by their respective multipliers. If set to `False`, it would be the average of these weighted components.
 
 ### 9. Calculating Polling Metrics
 
@@ -408,7 +438,8 @@ STATE_RANK_MULTIPLIER = 1.0
 
 1. **Data Filtering**: Select relevant polls for the candidates within the specified time frame.
 2. **Percentage Handling**: Standardize percentage values to ensure consistency.
-3. **Combined Weight Calculation**: Calculate the combined weight for each poll.
+   - If a percentage value (`pct`) is less than or equal to 1, it's assumed to be a proportion and multiplied by 100.
+3. **Combined Weight Calculation**: Calculate the combined weight for each poll using the methods described in [Combining Weights](#8-combining-weights).
 4. **Weighted Sum and Total Weights**:
    - **Weighted Sum**:
      $$
@@ -433,9 +464,50 @@ STATE_RANK_MULTIPLIER = 1.0
   $$
   \text{Margin of Error}_c = z \times \sqrt{\frac{p(1 - p)}{n_{\text{effective}}}} \times 100\%
   $$
-
+  
   - **\( p \)**: Proportion (Weighted Average divided by 100).
   - **\( z \)**: Z-score (default is 1.96 for 95% confidence).
+
+**Implementation**:
+
+- Utilize Pandas for efficient data filtering, aggregation, and computation.
+- Handle edge cases where `Total Weight` is zero to prevent division by zero errors.
+
+**Example Calculation**:
+
+For a candidate with the following polls:
+
+| Poll | Combined Weight (\( W_{\text{combined}} \)) | Percentage (\( \text{pct} \)) |
+|------|---------------------------------------------|--------------------------------|
+| 1    | 0.8                                         | 50                             |
+| 2    | 1.0                                         | 55                             |
+| 3    | 0.6                                         | 45                             |
+
+- **Weighted Sum**:
+  $$
+  \text{Weighted Sum} = (0.8 \times 50) + (1.0 \times 55) + (0.6 \times 45) = 40 + 55 + 27 = 122
+  $$
+  
+- **Total Weight**:
+  $$
+  \text{Total Weight} = 0.8 + 1.0 + 0.6 = 2.4
+  $$
+  
+- **Weighted Average**:
+  $$
+  \text{Weighted Average} = \frac{122}{2.4} \approx 50.83\%
+  $$
+
+- **Margin of Error**:
+  Assuming \( n_{\text{effective}} = 0.8 \times 1000 + 1.0 \times 800 + 0.6 \times 1200 = 800 + 800 + 720 = 2320 \),
+  $$
+  \text{Margin of Error} = 1.96 \times \sqrt{\frac{0.5083 \times (1 - 0.5083)}{2320}} \times 100\% \approx 1.96 \times 0.0103 \times 100\% \approx 2.02\%
+  $$
+
+**Output**:
+
+- **Weighted Average**: 50.83%
+- **Margin of Error**: ±2.02%
 
 ### 10. Calculating Favorability Differential
 
@@ -445,11 +517,51 @@ STATE_RANK_MULTIPLIER = 1.0
 
 1. **Data Filtering**: Extract favorability polls relevant to the candidates.
 2. **Normalization**: Standardize 'favorable' and 'unfavorable' percentages.
-3. **Combined Weight Calculation**: Calculate weights relevant to favorability data.
+   - If a favorability percentage is less than or equal to 1, it's assumed to be a proportion and multiplied by 100.
+3. **Combined Weight Calculation**: Calculate weights relevant to favorability data using similar methods as polling metrics.
 4. **Weighted Favorability Differential**:
    $$
-   \text{Favorability Differential}_c = \frac{\text{Weighted Favorable Sum}_c - \text{Weighted Unfavorable Sum}_c}{\text{Total Weight}_c}
+   \text{Favorability Differential}_c = \frac{\sum_{i \in c} W_{\text{combined}, i} \times \text{favorable}_i - \sum_{i \in c} W_{\text{combined}, i} \times \text{unfavorable}_i}{\sum_{i \in c} W_{\text{combined}, i}}
    $$
+
+**Implementation**:
+
+- Utilize Pandas for efficient data manipulation and aggregation.
+- Handle cases where `Total Weight` is zero to prevent division by zero errors.
+
+**Example Calculation**:
+
+For a candidate with the following favorability polls:
+
+| Poll | Combined Weight (\( W_{\text{combined}} \)) | Favorable (\( \text{favorable} \)) | Unfavorable (\( \text{unfavorable} \)) |
+|------|---------------------------------------------|--------------------------------------|----------------------------------------|
+| 1    | 0.9                                         | 60                                   | 30                                     |
+| 2    | 1.1                                         | 55                                   | 35                                     |
+| 3    | 0.7                                         | 50                                   | 40                                     |
+
+- **Weighted Favorable Sum**:
+  $$
+  (0.9 \times 60) + (1.1 \times 55) + (0.7 \times 50) = 54 + 60.5 + 35 = 149.5
+  $$
+  
+- **Weighted Unfavorable Sum**:
+  $$
+  (0.9 \times 30) + (1.1 \times 35) + (0.7 \times 40) = 27 + 38.5 + 28 = 93.5
+  $$
+  
+- **Total Weight**:
+  $$
+  \text{Total Weight} = 0.9 + 1.1 + 0.7 = 2.7
+  $$
+  
+- **Favorability Differential**:
+  $$
+  \text{Favorability Differential} = \frac{149.5 - 93.5}{2.7} \approx \frac{56}{2.7} \approx 20.74\%
+  $$
+
+**Output**:
+
+- **Favorability Differential**: +20.74%
 
 ### 11. Combining Polling Metrics and Favorability Differential
 
@@ -467,6 +579,28 @@ $$
 
 - Adjust the `FAVORABILITY_WEIGHT` in `config.py` or via the Streamlit app.
 - Compute the final result for each candidate using the formula above.
+- Utilize Pandas operations to merge and compute these metrics across the dataset efficiently.
+
+**Example Calculation**:
+
+Given:
+
+- **Polling Metric**: 50.83%
+- **Favorability Differential**: +20.74%
+- **Favorability Weight (\( \alpha \))**: 0.15
+
+The Combined Result would be:
+
+$$
+\text{Combined Result} = (1 - 0.15) \times 50.83 + 0.15 \times 20.74 \\
+= 0.85 \times 50.83 + 0.15 \times 20.74 \\
+= 43.188 + 3.111 \\
+= 46.299\%
+$$
+
+**Output**:
+
+- **Combined Result**: 46.30%
 
 ### 12. Out-of-Bag (OOB) Variance Calculation
 
@@ -475,6 +609,18 @@ $$
 **Methodology**:
 
 - **Random Forest Model**: Utilize the `RandomForestRegressor` with `oob_score=True`.
+- **Pipeline Components**:
+  1. **Imputation**:
+     - **Strategy**: `SimpleImputer` with a median strategy to handle missing data.
+     - **Function**: Ensures that all feature columns are free of missing values before model training.
+  2. **Model Training**:
+     - **Model**: `RandomForestRegressor` with specified parameters from `config.py`.
+     - **Parameters**:
+       ```python
+       N_TREES = 1000
+       RANDOM_STATE = 42
+       ```
+  
 - **OOB Variance**:
   $$
   \sigma_{\text{OOB}}^2 = \frac{1}{N} \sum_{i=1}^{N} \left( y_i - \hat{y}_i^{\text{OOB}} \right)^2
@@ -487,6 +633,45 @@ $$
 - The OOB error provides an unbiased estimate of the model's prediction error.
 - Enhances the reliability of the analysis by quantifying uncertainty.
 
+**Implementation**:
+
+- **Data Preparation**:
+  - Combine polling and favorability data into a single DataFrame.
+  - Select relevant feature columns based on availability.
+  
+- **Pipeline Execution**:
+  - Implement a `Pipeline` that first imputes missing data and then fits the Random Forest model.
+  
+- **Variance Calculation**:
+  - After fitting, extract the OOB predictions and calculate the variance between actual values and OOB predictions.
+  
+- **Error Handling**:
+  - If feature columns are missing or data is insufficient, log appropriate warnings and return a default variance value.
+
+**Example Calculation**:
+
+Suppose after model training:
+
+- **Actual Values (\( y \))**: [52, 48, 50, 51, 49]
+- **OOB Predictions (\( \hat{y}^{\text{OOB}} \))**: [51, 49, 50, 50, 50]
+
+Then:
+
+$$
+\sigma_{\text{OOB}}^2 = \frac{(52-51)^2 + (48-49)^2 + (50-50)^2 + (51-50)^2 + (49-50)^2}{5} \\
+= \frac{1 + 1 + 0 + 1 + 1}{5} \\
+= \frac{4}{5} \\
+= 0.8
+$$
+
+**Output**:
+
+- **OOB Variance**: 0.8
+
+**Implementation Note**:
+
+- The variance is reported as a single numerical value representing the average squared difference between actual and predicted values, providing insight into the model's prediction accuracy.
+
 ---
 
 ## Error Handling and Normalization
@@ -495,15 +680,39 @@ To ensure mathematical integrity and robustness, the project includes comprehens
 
 **Key Strategies**:
 
-- **Division by Zero Prevention**: Use of a small constant (`ZERO_CORRECTION = 0.0001`) to prevent division by zero in weight calculations.
-- **Missing Data Handling**: Assign default values or exclude data points with missing critical information.
-- **Percentage Interpretation**: Adjust percentages that are likely misformatted (e.g., values less than or equal to 1).
-- **Time Calculations**: Utilize timezone-aware timestamps and fractional days to accurately compute time-related weights.
+- **Division by Zero Prevention**:
+  - **Method**: Use of a small constant (`ZERO_CORRECTION = 0.0001`) to prevent division by zero in weight calculations.
+  - **Implementation**: Applied in scenarios where the denominator could potentially be zero, such as when normalizing weights.
+
+- **Missing Data Handling**:
+  - **Method**: Assign default values or exclude data points with missing critical information.
+  - **Implementation**: Utilizes Pandas functions like `dropna()` and `fillna()` to manage missing data effectively.
+
+- **Percentage Interpretation**:
+  - **Method**: Adjust percentages that are likely misformatted (e.g., values less than or equal to 1) by multiplying them by 100 to convert proportions to percentages.
+  - **Implementation**: Applies lambda functions within Pandas `apply()` methods to standardize percentage values.
+
+- **Time Calculations**:
+  - **Method**: Utilize timezone-aware timestamps and fractional days to accurately compute time-related weights.
+  - **Implementation**: Employs Pandas' `to_datetime()` with UTC time zones and calculates time differences in fractional days for precision.
 
 **Justification**:
 
 - These measures prevent computational errors and ensure that the analysis remains accurate and reliable.
 - Proper handling of data anomalies enhances the robustness of the results.
+
+**Implementation Example**:
+
+```python
+# Prevent division by zero by using ZERO_CORRECTION
+if max_numeric_grade != 0:
+    df['normalized_numeric_grade'] = df['numeric_grade'] / max_numeric_grade
+else:
+    df['normalized_numeric_grade'] = config.ZERO_CORRECTION
+
+# Normalize and clip to [0, 1]
+df['normalized_numeric_grade'] = df['normalized_numeric_grade'].clip(0, 1)
+```
 
 ---
 
@@ -513,14 +722,66 @@ To improve performance and user experience, the project implements data caching.
 
 **Features**:
 
-- **Caching Data Files**: Processed data is saved locally, reducing the need to re-fetch and re-process data on each run.
-- **Configuration Cache**: User settings are cached to maintain consistency across sessions.
-- **Force Refresh Option**: Users can clear caches and refresh data to incorporate the latest information or configuration changes.
+- **Caching Data Files**:
+  - **Purpose**: Processed data is saved locally, reducing the need to re-fetch and re-process data on each run.
+  - **Implementation**: Utilizes local CSV files to store processed polling and favorability data.
+
+- **Configuration Cache**:
+  - **Purpose**: User settings are cached to maintain consistency across sessions.
+  - **Implementation**: Stores configuration parameters in a JSON file to persist user-defined settings.
+
+- **Force Refresh Option**:
+  - **Purpose**: Users can clear caches and refresh data to incorporate the latest information or configuration changes.
+  - **Implementation**: Provides a checkbox in the Streamlit app to force data refresh, bypassing cached data.
 
 **Justification**:
 
 - Enhances performance, especially when dealing with large datasets or complex computations.
 - Provides flexibility for users to control when data and settings are refreshed.
+
+**Implementation Details**:
+
+- **Cache Files**:
+  - `sufficient_data.csv`: Stores the processed polling data that meets the minimum sample requirements.
+  - `config.json`: Stores the current configuration parameters.
+  - `results_df.csv`: Stores the results of the analysis across different periods.
+
+- **Caching Strategy**:
+  - On initial run, data is fetched, processed, and cached.
+  - On subsequent runs, cached data is loaded if available and configuration parameters haven't changed.
+  - If `force_refresh` is enabled, caches are cleared, and data is re-fetched and processed.
+
+**Implementation Example**:
+
+```python
+def load_and_process_data(config_vars, force_refresh=False):
+    cached_data = load_cached_data()
+    cached_results = load_cached_results_df()
+    cached_config = load_cached_config()
+
+    if not force_refresh and cached_data is not None and cached_config == config_vars:
+        st.info("Using cached data.")
+        sufficient_data_df = cached_data
+        results_df = cached_results
+        return sufficient_data_df, results_df
+
+    try:
+        # Update config with user-defined values
+        for key, value in config_vars.items():
+            setattr(config, key, value)
+        
+        results_df = get_analysis_results()
+        sufficient_data_df = preprocess_data(results_df)
+        
+        save_cached_data(sufficient_data_df)
+        save_cached_results_df(results_df)
+        save_cached_config(config_vars)
+        
+        return sufficient_data_df, results_df
+    except Exception as e:
+        st.error(f"An error occurred while processing data: {e}")
+        st.stop()
+```
 
 ---
 
@@ -533,7 +794,7 @@ All configuration parameters are centralized in `config.py` and can be adjusted 
 - **Candidates to Analyze**:
 
   ```python
-  CANDIDATE_NAMES = ['Candidate A', 'Candidate B']
+  CANDIDATE_NAMES = ['Kamala Harris', 'Donald Trump']
   ```
 
 - **Weight Multipliers**:
@@ -594,10 +855,40 @@ All configuration parameters are centralized in `config.py` and can be adjusted 
   RANDOM_STATE = 42
   ```
 
+**Adjusting Configuration**:
+
+- **Via `config.py`**:
+  - Directly edit the `config.py` file to set desired values.
+  
+- **Via Streamlit App**:
+  - The Streamlit interface provides sliders and input fields to adjust configuration parameters dynamically.
+  - Changes made through the app are saved and cached, ensuring consistency across sessions.
+
+**Implementation Example**:
+
+```python
+def configuration_form():
+    with st.sidebar:
+        # ... (UI components)
+        with st.form("config_form"):
+            favorability_weight = st.slider("Favorability Weight", 0.01, 1.0, float(config.FAVORABILITY_WEIGHT), 0.01)
+            heavy_weight = st.checkbox("Heavy Weight", config.HEAVY_WEIGHT)
+            # ... (additional configuration inputs)
+            submitted = st.form_submit_button("Apply Changes and Run Analysis")
+
+    if submitted:
+        return {
+            "FAVORABILITY_WEIGHT": favorability_weight,
+            "HEAVY_WEIGHT": heavy_weight,
+            # ... (additional configuration parameters)
+        }
+    return None
+```
+
 **Justification**:
 
-- Allows users to tailor the analysis to specific scenarios or hypotheses.
-- Facilitates sensitivity analyses by adjusting parameters and observing the impact on results.
+- Centralizing configuration parameters allows for easy adjustments and experimentation.
+- Providing both file-based and UI-based configuration options caters to different user preferences and workflows.
 
 ---
 
@@ -685,3 +976,89 @@ To further enhance the project, several avenues can be explored:
 - **Evaluation Framework**: Establish clear metrics and validation procedures to assess improvements.
 - **Iterative Testing**: Use cross-validation and other techniques to refine models and prevent overfitting.
 - **Community Engagement**: Encourage feedback and contributions from other analysts and stakeholders.
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+Ensure you have the following installed:
+
+- Python 3.8 or higher
+- `pip` package manager
+
+### Installation
+
+1. **Clone the Repository**:
+
+   ```bash
+   git clone https://github.com/yourusername/election-polling-analysis.git
+   cd election-polling-analysis
+   ```
+
+2. **Install Dependencies**:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### Running the Analysis
+
+1. **Execute the Core Analysis**:
+
+   ```bash
+   python analysis.py
+   ```
+
+   - This will fetch the latest polling and state data, perform the analysis, and output results to the console.
+
+2. **Launch the Streamlit App**:
+
+   ```bash
+   streamlit run app.py
+   ```
+
+   - This will open the interactive user interface in your default web browser.
+
+### Configuration
+
+- **Adjusting Parameters**:
+  - Modify `config.py` to change default parameters.
+  - Alternatively, use the Streamlit app to dynamically adjust settings via the sidebar.
+
+### Caching
+
+- **Cached Data Files**:
+  - Located in the `data` directory.
+  - Includes `sufficient_data.csv`, `config.json`, and `results_df.csv`.
+
+- **Clearing Cache**:
+  - Use the "Force Refresh Data" option in the Streamlit app or manually delete cache files from the `data` directory.
+
+### Documentation and Support
+
+- **Project Documentation**:
+  - Comprehensive details available in this `readme.md` file.
+  
+- **Support**:
+  - For issues or feature requests, please open an issue on the [GitHub repository](https://github.com/yourusername/election-polling-analysis/issues).
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
+---
+
+## Acknowledgments
+
+- **FiveThirtyEight**: For providing reliable and comprehensive polling and favorability data.
+- **270 To Win**: For offering detailed state-specific electoral data.
+
+---
+
+## Contact
+
+For any inquiries or feedback, please contact [polling@spencerthayer.com](mailto:polling@spencerthayer.com).
