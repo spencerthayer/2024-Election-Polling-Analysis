@@ -96,7 +96,17 @@ def clear_config_cache():
     else:
         st.info("No cached configuration found.")
 
-# Update the load_and_process_data function to use caching
+@st.cache_data
+def preprocess_data(results_df):
+    """Preprocess the data."""
+    try:
+        # Process the results_df to return sufficient_data_df
+        sufficient_data_df = results_df[results_df['message'].isnull()]
+        return sufficient_data_df
+    except Exception as e:
+        st.error(f"Error preprocessing data: {e}")
+        return None
+
 @st.cache_data
 def load_and_process_data(config_vars, force_refresh=False):
     """
@@ -126,7 +136,7 @@ def load_and_process_data(config_vars, force_refresh=False):
             setattr(config, key, value)
         
         results_df = get_analysis_results()
-        sufficient_data_df = results_df[results_df['message'].isnull()]
+        sufficient_data_df = preprocess_data(results_df)
         
         save_cached_data(sufficient_data_df)
         save_cached_results_df(results_df)
@@ -330,7 +340,7 @@ def configuration_form():
         with col1:
             st.header("Polling Configuration")
         with col2:
-            if st.button("⟲",help="Reset to default configuration"):
+            if st.button("⟲", help="Reset to default configuration"):
                 clear_config_cache()
                 st.rerun()
         
@@ -345,7 +355,6 @@ def configuration_form():
             st.markdown("<sup>Time decay parameter that controls the influence of older polls.</sup>", unsafe_allow_html=True)
             decay_rate = st.slider("Decay Rate", 0.01, 2.000, float(config.DECAY_RATE), 0.1)
             st.markdown("<sup>The rate at which older polls lose influence.</sup>", unsafe_allow_html=True)
-            # min_samples_required = st.number_input("Minimum Samples Required", 1, 100, int(config.MIN_SAMPLES_REQUIRED), 1)
             min_samples_required = st.slider("Minimum Samples Required", 2, 12, int(config.MIN_SAMPLES_REQUIRED), 2)
             st.markdown("<sup>The minimum number of samples required to perform analysis for a period.</sup>", unsafe_allow_html=True)
             

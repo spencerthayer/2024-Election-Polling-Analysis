@@ -1,3 +1,5 @@
+# analysis.py
+
 import pandas as pd
 import numpy as np
 import requests
@@ -119,6 +121,16 @@ def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = Non
     # Apply time decay weight
     df = apply_time_decay_weight(df, config.DECAY_RATE, config.HALF_LIFE_DAYS)
 
+    # Apply multipliers to the weights
+    df['time_decay_weight'] *= config.TIME_DECAY_WEIGHT_MULTIPLIER
+    df['sample_size_weight'] *= config.SAMPLE_SIZE_WEIGHT_MULTIPLIER
+    df['normalized_numeric_grade'] *= config.NORMALIZED_NUMERIC_GRADE_MULTIPLIER
+    df['normalized_pollscore'] *= config.NORMALIZED_POLLSCORE_MULTIPLIER
+    df['normalized_transparency_score'] *= config.NORMALIZED_TRANSPARENCY_SCORE_MULTIPLIER
+    df['population_weight'] *= config.POPULATION_WEIGHT_MULTIPLIER
+    df['partisan_weight'] *= config.PARTISAN_WEIGHT_MULTIPLIER
+    df['state_rank'] *= config.STATE_RANK_MULTIPLIER
+
     return df
 
 def apply_time_decay_weight(df: pd.DataFrame, decay_rate: float, half_life_days: int) -> pd.DataFrame:
@@ -176,14 +188,14 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
 
     # Prepare the weights with multipliers
     weight_components = {
-        'time_decay': df['time_decay_weight'] * config.TIME_DECAY_WEIGHT_MULTIPLIER,
-        'sample_size': df['sample_size_weight'] * config.SAMPLE_SIZE_WEIGHT_MULTIPLIER,
-        'numeric_grade': df['normalized_numeric_grade'] * config.NORMALIZED_NUMERIC_GRADE_MULTIPLIER,
-        'pollscore': df['normalized_pollscore'] * config.NORMALIZED_POLLSCORE_MULTIPLIER,
-        'transparency': df['normalized_transparency_score'] * config.NORMALIZED_TRANSPARENCY_SCORE_MULTIPLIER,
-        'population': df['population_weight'] * config.POPULATION_WEIGHT_MULTIPLIER,
-        'partisan': df['partisan_weight'] * config.PARTISAN_WEIGHT_MULTIPLIER,
-        'state_rank': df['state_rank'] * config.STATE_RANK_MULTIPLIER,
+        'time_decay': df['time_decay_weight'],
+        'sample_size': df['sample_size_weight'],
+        'numeric_grade': df['normalized_numeric_grade'],
+        'pollscore': df['normalized_pollscore'],
+        'transparency': df['normalized_transparency_score'],
+        'population': df['population_weight'],
+        'partisan': df['partisan_weight'],
+        'state_rank': df['state_rank'],
     }
 
     if config.HEAVY_WEIGHT:
