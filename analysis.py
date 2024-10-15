@@ -1,5 +1,3 @@
-# analysis.py
-
 import pandas as pd
 import numpy as np
 import requests
@@ -177,35 +175,45 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
     })
 
     # Prepare the weights with multipliers
-    list_weights = np.array([
-        df['time_decay_weight'] * config.TIME_DECAY_WEIGHT_MULTIPLIER,
-        df['sample_size_weight'] * config.SAMPLE_SIZE_WEIGHT_MULTIPLIER,
-        df['normalized_numeric_grade'] * config.NORMALIZED_NUMERIC_GRADE_MULTIPLIER,
-        df['normalized_pollscore'] * config.NORMALIZED_POLLSCORE_MULTIPLIER,
-        df['normalized_transparency_score'] * config.NORMALIZED_TRANSPARENCY_SCORE_MULTIPLIER,
-        df['population_weight'] * config.POPULATION_WEIGHT_MULTIPLIER,
-        df['partisan_weight'] * config.PARTISAN_WEIGHT_MULTIPLIER,
-        df['state_rank'] * config.STATE_RANK_MULTIPLIER,
-    ])
+    weight_components = {
+        'time_decay': df['time_decay_weight'] * config.TIME_DECAY_WEIGHT_MULTIPLIER,
+        'sample_size': df['sample_size_weight'] * config.SAMPLE_SIZE_WEIGHT_MULTIPLIER,
+        'numeric_grade': df['normalized_numeric_grade'] * config.NORMALIZED_NUMERIC_GRADE_MULTIPLIER,
+        'pollscore': df['normalized_pollscore'] * config.NORMALIZED_POLLSCORE_MULTIPLIER,
+        'transparency': df['normalized_transparency_score'] * config.NORMALIZED_TRANSPARENCY_SCORE_MULTIPLIER,
+        'population': df['population_weight'] * config.POPULATION_WEIGHT_MULTIPLIER,
+        'partisan': df['partisan_weight'] * config.PARTISAN_WEIGHT_MULTIPLIER,
+        'state_rank': df['state_rank'] * config.STATE_RANK_MULTIPLIER,
+    }
+
     if config.HEAVY_WEIGHT:
-        df['combined_weight'] = np.prod(list_weights, axis=0)
+        df['combined_weight'] = np.prod(list(weight_components.values()), axis=0)
     else:
-        df['combined_weight'] = np.mean(list_weights, axis=0)
+        df['combined_weight'] = np.mean(list(weight_components.values()), axis=0)
 
-    weighted_sums = df.groupby('candidate_name')['combined_weight'].apply(
-        lambda x: (x * df.loc[x.index, 'pct']).sum()
-    ).fillna(0)
-    total_weights = df.groupby('candidate_name')['combined_weight'].sum().fillna(0)
+    results = {}
+    for candidate in candidate_names:
+        candidate_df = df[df['candidate_name'] == candidate]
+        
+        weighted_sum = (candidate_df['combined_weight'] * candidate_df['pct']).sum()
+        total_weight = candidate_df['combined_weight'].sum()
+        
+        weighted_average = weighted_sum / total_weight if total_weight > 0 else 0
+        moe = calculate_timeframe_specific_moe(candidate_df, [candidate])
+        
+        results[candidate] = (weighted_average, moe)
+        
+        print(f"\nDetailed calculations for {candidate}:")
+        print(f"  Total polls: {len(candidate_df)}")
+        print("  Weight components (mean values):")
+        for component, values in weight_components.items():
+            print(f"    {component}: {values[candidate_df.index].mean():.4f}")
+        print(f"  Combined weight (sum): {total_weight:.4f}")
+        print(f"  Weighted sum: {weighted_sum:.4f}")
+        print(f"  Weighted average: {weighted_average:.2f}%")
+        print(f"  Margin of Error: ±{moe:.2f}%")
 
-    weighted_averages = (weighted_sums / total_weights).fillna(0)
-
-    weighted_margins = {
-        candidate: calculate_timeframe_specific_moe(df[df['candidate_name'] == candidate], [candidate]) for candidate in candidate_names
-    }
-
-    return {
-        candidate: (weighted_averages.get(candidate, 0.0), weighted_margins.get(candidate, 0.0)) for candidate in candidate_names
-    }
+    return results
 
 def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[str]) -> Dict[str, float]:
     """
@@ -215,54 +223,39 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
     # Ensure 'favorable' is correctly interpreted as a percentage
     df['favorable'] = df['favorable'].apply(lambda x: x if x > 1 else x * 100)
 
-    # Normalize 'numeric_grade'
-    df['numeric_grade'] = pd.to_numeric(df['numeric_grade'], errors='coerce').fillna(0)
-    max_numeric_grade = df['numeric_grade'].max()
-    if max_numeric_grade != 0:
-        df['normalized_numeric_grade'] = df['numeric_grade'] / max_numeric_grade
-    else:
-        df['normalized_numeric_grade'] = config.ZERO_CORRECTION
-    df['normalized_numeric_grade'] = df['normalized_numeric_grade'].clip(0, 1)
-
-    # Invert and normalize 'pollscore'
-    df['pollscore'] = pd.to_numeric(df['pollscore'], errors='coerce').fillna(0)
-    min_pollscore = df['pollscore'].min()
-    max_pollscore = df['pollscore'].max()
-    if max_pollscore - min_pollscore != 0:
-        df['normalized_pollscore'] = 1 - (df['pollscore'] - min_pollscore) / (max_pollscore - min_pollscore)
-    else:
-        df['normalized_pollscore'] = config.ZERO_CORRECTION
-    df['normalized_pollscore'] = df['normalized_pollscore'].clip(0, 1)
-
-    # Normalize 'transparency_score'
-    df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
-    max_transparency_score = df['transparency_score'].max()
-    if max_transparency_score != 0:
-        df['normalized_transparency_score'] = df['transparency_score'] / max_transparency_score
-    else:
-        df['normalized_transparency_score'] = config.ZERO_CORRECTION
-    df['normalized_transparency_score'] = df['normalized_transparency_score'].clip(0, 1)
-
     # Prepare weights with multipliers
-    list_weights = np.array([
-        df['normalized_numeric_grade'] * config.NORMALIZED_NUMERIC_GRADE_MULTIPLIER,
-        df['normalized_pollscore'] * config.NORMALIZED_POLLSCORE_MULTIPLIER,
-        df['normalized_transparency_score'] * config.NORMALIZED_TRANSPARENCY_SCORE_MULTIPLIER
-    ])
+    weight_components = {
+        'numeric_grade': df['normalized_numeric_grade'] * config.NORMALIZED_NUMERIC_GRADE_MULTIPLIER,
+        'pollscore': df['normalized_pollscore'] * config.NORMALIZED_POLLSCORE_MULTIPLIER,
+        'transparency': df['normalized_transparency_score'] * config.NORMALIZED_TRANSPARENCY_SCORE_MULTIPLIER
+    }
 
     if config.HEAVY_WEIGHT:
-        df['combined_weight'] = np.prod(list_weights, axis=0)
+        df['combined_weight'] = np.prod(list(weight_components.values()), axis=0)
     else:
-        df['combined_weight'] = np.mean(list_weights, axis=0)
+        df['combined_weight'] = np.mean(list(weight_components.values()), axis=0)
 
-    weighted_sums = df.groupby('politician')['combined_weight'].apply(
-        lambda x: (x * df.loc[x.index, 'favorable']).sum()
-    ).fillna(0)
-    total_weights = df.groupby('politician')['combined_weight'].sum().fillna(0)
+    results = {}
+    for candidate in candidate_names:
+        candidate_df = df[df['politician'] == candidate]
+        
+        weighted_sum = (candidate_df['combined_weight'] * candidate_df['favorable']).sum()
+        total_weight = candidate_df['combined_weight'].sum()
+        
+        weighted_average = weighted_sum / total_weight if total_weight > 0 else 0
+        
+        results[candidate] = weighted_average
+        
+        print(f"\nDetailed favorability calculations for {candidate}:")
+        print(f"  Total polls: {len(candidate_df)}")
+        print("  Weight components (mean values):")
+        for component, values in weight_components.items():
+            print(f"    {component}: {values[candidate_df.index].mean():.4f}")
+        print(f"  Combined weight (sum): {total_weight:.4f}")
+        print(f"  Weighted sum: {weighted_sum:.4f}")
+        print(f"  Weighted average favorability: {weighted_average:.2f}%")
 
-    weighted_averages = (weighted_sums / total_weights).fillna(0)
-
-    return {candidate: weighted_averages.get(candidate, 0.0) for candidate in candidate_names}
+    return results
 
 def combine_analysis(
     polling_metrics: Dict[str, Tuple[float, float]],
@@ -280,12 +273,15 @@ def combine_analysis(
         combined_metrics[candidate] = (combined_score, margin)
     return combined_metrics
 
-def calculate_oob_variance(df: pd.DataFrame) -> float:
+def calculate_oob_variance(polling_df: pd.DataFrame, favorability_df: pd.DataFrame) -> float:
     """
-    Calculate the out-of-bag variance using Random Forest regression.
+    Calculate the out-of-bag variance using Random Forest regression on combined polling and favorability data.
     """
-    if df.empty:
-        return 0.0  # Return 0 variance if DataFrame is empty
+    if polling_df.empty and favorability_df.empty:
+        return 0.0  # Return 0 variance if both DataFrames are empty
+
+    # Combine polling and favorability data
+    combined_df = pd.concat([polling_df, favorability_df], axis=0, sort=False)
 
     # Define all possible feature columns
     all_features = [
@@ -299,15 +295,17 @@ def calculate_oob_variance(df: pd.DataFrame) -> float:
         'time_decay_weight'
     ]
 
-    # Filter to only use columns that exist in the DataFrame
-    features_columns = [col for col in all_features if col in df.columns]
+    # Filter to only use columns that exist in the combined DataFrame
+    features_columns = [col for col in all_features if col in combined_df.columns]
 
     if not features_columns:
         logging.warning("No valid feature columns found for OOB variance calculation.")
         return 0.0
 
-    X = df[features_columns].values
-    y = df['favorable'].values
+    X = combined_df[features_columns].values
+    
+    # Use 'pct' from polling data and 'favorable' from favorability data as the target
+    y = combined_df['pct'].fillna(combined_df['favorable']).values
 
     pipeline = Pipeline(steps=[
         ('imputer', FunctionTransformer(impute_data)),
@@ -411,12 +409,12 @@ def calculate_results_for_period(
         (favorability_df['politician'].isin(config.CANDIDATE_NAMES))
     ].copy()
 
-    # Debug statements to verify filtering
-    logging.info(f"Period: {period_value} {period_type}")
-    logging.info(f"Filtered polling data size: {filtered_polling_df.shape}")
-    logging.info(f"Filtered favorability data size: {filtered_favorability_df.shape}")
+    print(f"\n--- Period: {period_value} {period_type} ---")
+    print(f"Filtered polling data size: {filtered_polling_df.shape}")
+    print(f"Filtered favorability data size: {filtered_favorability_df.shape}")
 
     if filtered_polling_df.shape[0] < config.MIN_SAMPLES_REQUIRED:
+        print("Not enough polling data for this period.")
         return {
             'period': f"{period_value} {period_type}",
             'harris_polling': None,
@@ -432,6 +430,7 @@ def calculate_results_for_period(
         }
 
     # Calculate polling metrics
+    print("\nCalculating Polling Metrics:")
     polling_metrics = calculate_polling_metrics(filtered_polling_df, config.CANDIDATE_NAMES)
 
     # Initialize variables
@@ -440,22 +439,42 @@ def calculate_results_for_period(
     oob_variance = None
     favorability_differential = {}
 
-    # Check if we have enough favorability data
-    if filtered_favorability_df.shape[0] >= config.MIN_SAMPLES_REQUIRED:
+    # Check if we have enough data
+    if filtered_polling_df.shape[0] >= config.MIN_SAMPLES_REQUIRED or filtered_favorability_df.shape[0] >= config.MIN_SAMPLES_REQUIRED:
+        print("\nCalculating Favorability Differential:")
         favorability_differential = calculate_favorability_differential(
             filtered_favorability_df, config.CANDIDATE_NAMES
         )
         harris_fav = favorability_differential.get('Kamala Harris', None)
         trump_fav = favorability_differential.get('Donald Trump', None)
-        oob_variance = calculate_oob_variance(filtered_favorability_df)
+        
+        # Calculate OOB variance using both polling and favorability data
+        oob_variance = calculate_oob_variance(filtered_polling_df, filtered_favorability_df)
+        
+        print(f"\nOOB Variance (combined data): {oob_variance:.2f}")
     else:
-        harris_fav = None
-        trump_fav = None
+        print("\nNot enough data for this period.")
 
     # Combine polling metrics and favorability
     combined_results = combine_analysis(
         polling_metrics, favorability_differential, config.FAVORABILITY_WEIGHT
     )
+    
+    print("\nCombined Results Details:")
+    for candidate, (combined, moe) in combined_results.items():
+        print(f"{candidate}:")
+        print(f"  Polling: {polling_metrics[candidate][0]:.2f}%")
+        print(f"  Favorability: {favorability_differential.get(candidate, 'N/A')}")
+        print(f"  Combined: {combined:.2f}% ± {moe:.2f}%")
+        print(f"  Calculation: {polling_metrics[candidate][0]:.2f} * (1 - {config.FAVORABILITY_WEIGHT}) + "
+              f"{favorability_differential.get(candidate, 0):.2f} * {config.FAVORABILITY_WEIGHT}")
+
+    harris_combined = combined_results['Kamala Harris'][0]
+    trump_combined = combined_results['Donald Trump'][0]
+    differential = harris_combined - trump_combined
+    favored_candidate = "Harris" if differential > 0 else "Trump"
+
+    print(f"\nDifferential: {differential:.2f}% favoring {favored_candidate}")
 
     return {
         'period': f"{period_value} {period_type}",
@@ -463,8 +482,8 @@ def calculate_results_for_period(
         'trump_polling': polling_metrics['Donald Trump'][0],
         'harris_fav': harris_fav,
         'trump_fav': trump_fav,
-        'harris_combined': combined_results['Kamala Harris'][0],
-        'trump_combined': combined_results['Donald Trump'][0],
+        'harris_combined': harris_combined,
+        'trump_combined': trump_combined,
         'harris_moe': polling_metrics['Kamala Harris'][1],
         'trump_moe': polling_metrics['Donald Trump'][1],
         'oob_variance': oob_variance,

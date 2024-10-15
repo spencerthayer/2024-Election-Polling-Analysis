@@ -346,7 +346,7 @@ def configuration_form():
             decay_rate = st.slider("Decay Rate", 0.01, 2.000, float(config.DECAY_RATE), 0.1)
             st.markdown("<sup>The rate at which older polls lose influence.</sup>", unsafe_allow_html=True)
             # min_samples_required = st.number_input("Minimum Samples Required", 1, 100, int(config.MIN_SAMPLES_REQUIRED), 1)
-            min_samples_required = st.slider("Minimum Samples Required", 2, 10, int(config.MIN_SAMPLES_REQUIRED), 2)
+            min_samples_required = st.slider("Minimum Samples Required", 2, 12, int(config.MIN_SAMPLES_REQUIRED), 2)
             st.markdown("<sup>The minimum number of samples required to perform analysis for a period.</sup>", unsafe_allow_html=True)
             
             st.subheader("Partisan Polling Weight")
