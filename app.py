@@ -293,10 +293,18 @@ def create_differential_bar_chart(df: pd.DataFrame):
 
     # Create a DataFrame for the key
     key_data = pd.DataFrame({
-        'label': ['Harris Lead', 'Harris MOE', 'Trump Lead', 'Trump MOE'],
-        'color': [HARRIS_COLOR, HARRIS_COLOR_LIGHT, TRUMP_COLOR, TRUMP_COLOR_LIGHT],
-        'x': [0, 0, 1, 1],
-        'y': [0, 1, 0, 1]
+        'label': [
+            'Harris Lead', 'Harris Uncertainty',
+            'Trump Lead', 'Trump Uncertainty',
+            'Margin of Error'
+            ],
+        'color': [
+            HARRIS_COLOR, HARRIS_COLOR_LIGHT,
+            TRUMP_COLOR, TRUMP_COLOR_LIGHT,
+            '#7D7A82'
+            ],
+        'x': [0, 0, 1, 1, 2],
+        'y': [0, 1, 0, 1, 0]
     })
 
     # Create the key chart
