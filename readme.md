@@ -271,11 +271,14 @@ PARTISAN_WEIGHT = {True: 0.01, False: 1.0}
 
 - These weights are assigned using a dictionary and can be adjusted in `config.py` or via the Streamlit app to reflect changes in voter behavior or to conduct sensitivity analyses.
 
+
 ### 7. State Rank Weight
 
-The **State Rank Weight** integrates the electoral significance, political leaning, and current forecasts of each state into the overall weighting of polls. This weight ensures that polls from states that are more influential in the electoral college, have competitive political landscapes, and are projected to have close races are given greater consideration in the analysis.
+The analysis incorporates both state-specific rankings and special handling for national polls to ensure a comprehensive and nuanced approach to poll weighting.
 
-**Objective**: To calculate a weight for each poll based on the state's electoral importance, partisan classification, and current election forecasts, thereby prioritizing polls from significant and competitive states.
+#### 7.1 State Rank Weight
+
+**Objective**: To calculate a weight for each state poll based on the state's electoral importance, partisan classification, and current election forecasts, thereby prioritizing polls from significant and competitive states.
 
 **Mathematical Formulation**:
 
@@ -317,56 +320,56 @@ Where:
      - **Forecast Median**: The median forecasted margin between the candidates from FiveThirtyEight's data.
    - **Justification**: Prioritizes states with closer races, as they are more likely to influence the election outcome.
 
+#### 7.2 National Poll Handling
+
+**Objective**: To appropriately weight national polls in relation to state polls, recognizing their distinct nature and potential impact on the overall analysis.
+
+**Implementation**:
+
+1. **Identification of National Polls**:
+   - National polls are identified by the absence of state-specific information:
+     ```python
+     df['is_national'] = df['state'].isnull() | (df['state'] == '')
+     ```
+
+2. **Special Weighting for National Polls**:
+   - National polls receive an additional weight adjustment:
+     ```python
+     national_weight = config.NATIONAL_POLL_WEIGHT
+     df.loc[df['is_national'], 'combined_weight'] *= national_weight
+     ```
+   - This allows for fine-tuning the influence of national polls relative to state polls in the overall analysis.
+
+3. **Configurable National Poll Weight**:
+   - The `NATIONAL_POLL_WEIGHT` can be adjusted in the configuration to increase or decrease the impact of national polls.
+
+**Justification**:
+- National polls provide a broad overview of the electoral landscape but may not capture state-specific nuances.
+- This approach allows for balancing the insights from national polls with the more granular information provided by state polls.
+- The configurable weight enables analysts to adjust the relative importance of national polls based on their assessment of poll reliability and relevance.
+
 **Implementation Details**:
 
-- **Data Retrieval**:
-  - The `states.py` script fetches:
-    - `pro_status` codes and electoral votes from 270 To Win.
-    - Forecast medians from FiveThirtyEight's forecast JSON data.
-- **State Rank Calculation**:
-  - Each state's rank is calculated using the weighted sum formula above.
-  - The ranks are normalized and used as weights in the polling analysis.
-- **Incorporation into Combined Weight**:
-  - The State Rank Weight is included as one of the factors in the combined weight calculation (see [Combining Weights](#8-combining-weights)).
-  - Its influence can be adjusted using the `STATE_RANK_MULTIPLIER` in `config.py`:
+- The State Rank Weight is incorporated into the overall poll weighting as one of the factors in the combined weight calculation.
+- Its influence can be adjusted using the `STATE_RANK_MULTIPLIER` in `config.py`:
 
-    ```python
-    STATE_RANK_MULTIPLIER = 1.0  # Adjust to increase or decrease influence
-    ```
+  ```python
+  STATE_RANK_MULTIPLIER = 1.0  # Adjust to increase or decrease influence
+  ```
 
-**Handling Missing Forecast Data**:
+- National polls are handled separately and their weight can be adjusted using `NATIONAL_POLL_WEIGHT` in `config.py`:
 
-- If forecast data for a state is missing, a default forecast weight is applied to prevent computational errors.
+  ```python
+  NATIONAL_POLL_WEIGHT = 1.0  # Adjust to increase or decrease influence of national polls
+  ```
 
 **Considerations**:
 
-- **Dynamic Political Landscape**:
-  - The state's `pro_status` and forecast data are regularly updated to reflect the most current information.
-- **Data Handling**:
-  - The `states.py` script ensures that if forecast data is missing or incomplete, default values are used to maintain computational integrity.
-- **Weight Sensitivity**:
-  - The weighting percentages (40%, 30%, 30%) can be adjusted to emphasize different components based on analytical needs.
+- **Dynamic Political Landscape**: The state's `pro_status` and forecast data are regularly updated to reflect the most current information.
+- **Data Handling**: The `states.py` script ensures that if forecast data is missing or incomplete, default values are used to maintain computational integrity.
+- **Weight Sensitivity**: The weighting percentages and multipliers can be adjusted to emphasize different components based on analytical needs or to reflect changing dynamics in the election landscape.
 
-**Example Calculation**:
-
-Suppose we have a state with the following characteristics:
-
-- **Pro Status**: `T` (Toss-up state), so `Pro Status Value = 0.8`
-- **Electoral Votes**: 20, so `Normalized Electoral Votes = 20 / 538 ≈ 0.0372`
-- **Forecast Median**: 2.5 (indicating a close race), so:
-  $$
-  \text{Forecast Weight} = 1 - \left( \frac{2.5}{100} \right) = 0.975
-  $$
-
-The State Rank would be:
-
-$$
-\text{State Rank} = (0.8 \times 0.4) + (0.0372 \times 0.3) + (0.975 \times 0.3) \\
-= 0.32 + 0.01116 + 0.2925 \\
-\approx 0.62366
-$$
-
-This high rank indicates that the state is both competitive and significant in terms of electoral votes and current forecasts.
+By incorporating both state-specific rankings and special handling for national polls, this approach provides a comprehensive framework for weighting different types of polls, ensuring that both state-level dynamics and national
 
 ### 8. Combining Weights
 
