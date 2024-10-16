@@ -14,6 +14,7 @@ NORMALIZED_TRANSPARENCY_SCORE_MULTIPLIER = 1.0
 POPULATION_WEIGHT_MULTIPLIER = 1.0
 PARTISAN_WEIGHT_MULTIPLIER = 1.0
 STATE_RANK_MULTIPLIER = 1.0
+NATIONAL_POLL_WEIGHT = 1.0
 
 # Weight given to favorability in the combined analysis (between 0 and 1)
 FAVORABILITY_WEIGHT = 0.1  # Adjust this value between 0 (no favorability influence) and 1 (only favorability)
