@@ -276,11 +276,12 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
         total_weight = candidate_df['combined_weight'].sum()
         
         if total_weight > 0:
-            favorability_differential = (weighted_favorable - weighted_unfavorable) / total_weight
+            # Calculate favorability as a percentage
+            favorability = (weighted_favorable / total_weight)
         else:
-            favorability_differential = 0
+            favorability = 0
         
-        results[candidate] = favorability_differential
+        results[candidate] = favorability
         
         print(f"\nDetailed favorability calculations for {candidate}:")
         print(f"  Total polls: {len(candidate_df)}")
@@ -290,24 +291,27 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
         print(f"  Combined weight (sum): {total_weight:.4f}")
         print(f"  Weighted favorable sum: {weighted_favorable:.4f}")
         print(f"  Weighted unfavorable sum: {weighted_unfavorable:.4f}")
-        print(f"  Favorability differential: {favorability_differential:.2f}%")
+        print(f"  Favorability: {favorability:.2f}%")
         print(f"  National polls: {candidate_df['is_national'].sum()}")
 
     return results
 
 def combine_analysis(
     polling_metrics: Dict[str, Tuple[float, float]],
-    favorability_differential: Dict[str, float],
+    favorability_scores: Dict[str, float],
     favorability_weight: float
 ) -> Dict[str, Tuple[float, float]]:
     """
-    Combine polling metrics and favorability differentials into a unified analysis.
+    Combine polling metrics and favorability scores into a unified analysis.
     """
     combined_metrics = {}
     for candidate in polling_metrics.keys():
-        fav_diff = favorability_differential.get(candidate, polling_metrics[candidate][0])
         polling_score, margin = polling_metrics[candidate]
-        combined_score = polling_score * (1 - favorability_weight) + fav_diff * favorability_weight
+        favorability = favorability_scores.get(candidate, polling_score)
+        
+        # Combine polling score and favorability
+        combined_score = polling_score * (1 - favorability_weight) + favorability * favorability_weight
+        
         combined_metrics[candidate] = (combined_score, margin)
     return combined_metrics
 
