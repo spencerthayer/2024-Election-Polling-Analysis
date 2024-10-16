@@ -110,10 +110,6 @@ def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = Non
         False: config.PARTISAN_WEIGHT[False]
     })
 
-    # Logging for debugging
-    logging.debug(f"Unique partisan values: {df['partisan'].unique()}")
-    logging.debug(f"Count of partisan polls: {df['is_partisan'].sum()}")
-
     # Calculate state_rank using get_state_data()
     state_data = get_state_data()
     df['state_rank'] = df['state'].apply(lambda x: state_data.get(x, 1.0))
@@ -140,7 +136,27 @@ def apply_time_decay_weight(df: pd.DataFrame, decay_rate: float, half_life_days:
     try:
         reference_date = pd.Timestamp.now(tz='UTC')
         days_old = (reference_date - df['created_at']).dt.total_seconds() / (24 * 3600)
-        df['time_decay_weight'] = np.exp(-np.log(decay_rate) * days_old / half_life_days)
+        
+        # Calculate decay constant
+        lambda_decay = np.log(decay_rate) / half_life_days
+        
+        # Apply exponential decay
+        df['time_decay_weight'] = np.exp(-lambda_decay * days_old)
+        
+        # Normalize weights to [0, 1] range
+        max_weight = df['time_decay_weight'].max()
+        min_weight = df['time_decay_weight'].min()
+        if max_weight != min_weight:
+            df['time_decay_weight'] = (df['time_decay_weight'] - min_weight) / (max_weight - min_weight)
+        else:
+            df['time_decay_weight'] = 1.0  # If all weights are the same, set to 1
+        
+        # Apply multiplier from config
+        df['time_decay_weight'] *= config.TIME_DECAY_WEIGHT_MULTIPLIER
+        
+        # Clip weights to ensure they're within [0, 1]
+        df['time_decay_weight'] = df['time_decay_weight'].clip(0, 1)
+        
         return df
     except Exception as e:
         logging.error(f"Error applying time decay: {e}")
@@ -205,8 +221,7 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
 
     # Handle national polls
     df['is_national'] = df['state'].isnull() | (df['state'] == '')
-    national_weight = config.NATIONAL_POLL_WEIGHT
-    df.loc[df['is_national'], 'combined_weight'] *= national_weight
+    df.loc[df['is_national'], 'combined_weight'] *= config.NATIONAL_POLL_WEIGHT
 
     results = {}
     for candidate in candidate_names:
@@ -288,6 +303,7 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
         print("  Weight components (mean values):")
         for component, values in weight_components.items():
             print(f"    {component}: {values[candidate_df.index].mean():.4f}")
+        print(f"  National poll weight: {config.NATIONAL_POLL_WEIGHT:.4f}")
         print(f"  Combined weight (sum): {total_weight:.4f}")
         print(f"  Weighted favorable sum: {weighted_favorable:.4f}")
         print(f"  Weighted unfavorable sum: {weighted_unfavorable:.4f}")
