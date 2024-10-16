@@ -191,7 +191,7 @@ def calculate_timeframe_specific_moe(df: pd.DataFrame, candidate_names: List[str
                 moes.append(moe)
     return np.mean(moes) if moes else np.nan
 
-def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> Dict[str, Tuple[float, float]]:
+def calculate_polling(df: pd.DataFrame, candidate_names: List[str]) -> Dict[str, Tuple[float, float]]:
     """
     Calculate polling metrics for the specified candidate names.
     """
@@ -217,6 +217,10 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
         'state_rank': df['state_rank'] * config.STATE_RANK_MULTIPLIER,
     }
 
+    # Normalize weights after applying multipliers
+    for component in weight_components:
+        weight_components[component] = weight_components[component] / weight_components[component].max()
+
     if config.HEAVY_WEIGHT:
         df['combined_weight'] = np.prod(list(weight_components.values()), axis=0)
     else:
@@ -225,6 +229,9 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
     # Handle national polls
     df['is_national'] = df['state'].isnull() | (df['state'] == '')
     df.loc[df['is_national'], 'combined_weight'] *= config.NATIONAL_POLL_WEIGHT
+
+    # Normalize combined_weight
+    df['combined_weight'] = df['combined_weight'] / df['combined_weight'].max()
 
     results = {}
     for candidate in candidate_names:
@@ -251,7 +258,7 @@ def calculate_polling_metrics(df: pd.DataFrame, candidate_names: List[str]) -> D
 
     return results
 
-def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[str]) -> Dict[str, float]:
+def calculate_favorability(df: pd.DataFrame, candidate_names: List[str]) -> Dict[str, float]:
     """
     Calculate favorability differentials for the specified candidate names,
     aligning more closely with polling metrics calculation.
@@ -276,6 +283,10 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
         'state_rank': df['state_rank'] * config.STATE_RANK_MULTIPLIER,
     }
 
+    # Normalize weights after applying multipliers
+    for component in weight_components:
+        weight_components[component] = weight_components[component] / weight_components[component].max()
+
     if config.HEAVY_WEIGHT:
         df['combined_weight'] = np.prod(list(weight_components.values()), axis=0)
     else:
@@ -284,6 +295,9 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
     # Handle national polls
     df['is_national'] = df['state'].isnull() | (df['state'] == '')
     df.loc[df['is_national'], 'combined_weight'] *= config.NATIONAL_POLL_WEIGHT
+
+    # Normalize combined_weight
+    df['combined_weight'] = df['combined_weight'] / df['combined_weight'].max()
 
     results = {}
     for candidate in candidate_names:
@@ -294,7 +308,6 @@ def calculate_favorability_differential(df: pd.DataFrame, candidate_names: List[
         total_weight = candidate_df['combined_weight'].sum()
         
         if total_weight > 0:
-            # Calculate favorability as a percentage
             favorability = (weighted_favorable / total_weight)
         else:
             favorability = 0
@@ -492,7 +505,7 @@ def calculate_results_for_period(
 
     # Calculate polling metrics
     print("\nCalculating Polling Metrics:")
-    polling_metrics = calculate_polling_metrics(filtered_polling_df, config.CANDIDATE_NAMES)
+    polling_metrics = calculate_polling(filtered_polling_df, config.CANDIDATE_NAMES)
 
     # Initialize variables
     harris_fav = None
@@ -503,7 +516,7 @@ def calculate_results_for_period(
     # Check if we have enough data
     if filtered_polling_df.shape[0] >= config.MIN_SAMPLES_REQUIRED or filtered_favorability_df.shape[0] >= config.MIN_SAMPLES_REQUIRED:
         print("\nCalculating Favorability Differential:")
-        favorability_differential = calculate_favorability_differential(
+        favorability_differential = calculate_favorability(
             filtered_favorability_df, config.CANDIDATE_NAMES
         )
         harris_fav = favorability_differential.get('Kamala Harris', None)
