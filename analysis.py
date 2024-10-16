@@ -131,7 +131,7 @@ def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = Non
 
 def apply_time_decay_weight(df: pd.DataFrame, decay_rate: float, half_life_days: int) -> pd.DataFrame:
     """
-    Apply time decay weighting to the data based on the specified decay rate and half-life.
+    Apply time decay weighting to the data based on the specified decay rate and half-life using a logarithmic scale.
     """
     try:
         reference_date = pd.Timestamp.now(tz='UTC')
@@ -142,6 +142,9 @@ def apply_time_decay_weight(df: pd.DataFrame, decay_rate: float, half_life_days:
         
         # Apply exponential decay
         df['time_decay_weight'] = np.exp(-lambda_decay * days_old)
+        
+        # Apply logarithmic transformation
+        df['time_decay_weight'] = np.log1p(df['time_decay_weight'])
         
         # Normalize weights to [0, 1] range
         max_weight = df['time_decay_weight'].max()
