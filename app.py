@@ -388,6 +388,7 @@ def configuration_form():
             population_weight_multiplier = st.slider("Population Weight Multiplier", 0.01, 2.0, float(config.POPULATION_WEIGHT_MULTIPLIER), 0.1)
             partisan_weight_multiplier = st.slider("Partisan Weight Multiplier", 0.01, 2.0, float(config.PARTISAN_WEIGHT_MULTIPLIER), 0.1)
             state_rank_multiplier = st.slider("State Rank Multiplier", 0.01, 2.0, float(config.STATE_RANK_MULTIPLIER), 0.1)
+            national_poll_weight = st.slider("National Poll Weight", 0.01, 2.0, float(config.NATIONAL_POLL_WEIGHT), 0.1)
             
             force_refresh = st.checkbox("Force Refresh Data", False)
             
@@ -416,6 +417,7 @@ def configuration_form():
             "POPULATION_WEIGHT_MULTIPLIER": population_weight_multiplier,
             "PARTISAN_WEIGHT_MULTIPLIER": partisan_weight_multiplier,
             "STATE_RANK_MULTIPLIER": state_rank_multiplier,
+            "NATIONAL_POLL_WEIGHT": national_poll_weight,
             "FORCE_REFRESH": force_refresh
         }
     return None
