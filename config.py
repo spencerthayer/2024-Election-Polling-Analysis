@@ -23,7 +23,7 @@ FAVORABILITY_WEIGHT = 0.1  # Adjust this value between 0 (no favorability influe
 HEAVY_WEIGHT = True  # Set to True to use multiplicative weighting, False for additive weighting
 
 # Set to True to remove pollsters who are trying to game the system
-PURGE_POLLS = False
+PURGE_POLLS = True
 
 # Time decay parameters
 DECAY_RATE = 1.0     # Decay rate for time decay weighting (e.g., 0.5 for a slow 50% decay use 2 for a faster 200% decay)
@@ -34,7 +34,7 @@ MIN_SAMPLES_REQUIRED = 6 # Minimum number of data points required to perform ana
 
 CREDIBILITY_METRICS = ['numeric_grade', 'pollscore', 'transparency_score']
 
-ZERO_CORRECTION = 0  # Small value to prevent division by zero in calculations
+ZERO_CORRECTION = 0.001  # Small value to prevent division by zero in calculations
 
 # Random Forest parameters
 N_TREES = 1000       # Number of trees in the Random Forest
