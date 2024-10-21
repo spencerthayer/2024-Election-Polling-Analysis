@@ -29,7 +29,9 @@ HALF_LIFE_DAYS = 14  # Half-life in days for time decay weighting
 # Minimum number of samples required for analysis
 MIN_SAMPLES_REQUIRED = 6 # Minimum number of data points required to perform analysis for a period
 
-ZERO_CORRECTION = 0.0001  # Small value to prevent division by zero in calculations
+CREDIBILITY_METRICS = ['numeric_grade', 'pollscore', 'transparency_score']
+
+ZERO_CORRECTION = 0  # Small value to prevent division by zero in calculations
 
 # Random Forest parameters
 N_TREES = 1000       # Number of trees in the Random Forest

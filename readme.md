@@ -271,7 +271,6 @@ PARTISAN_WEIGHT = {True: 0.01, False: 1.0}
 
 - These weights are assigned using a dictionary and can be adjusted in `config.py` or via the Streamlit app to reflect changes in voter behavior or to conduct sensitivity analyses.
 
-
 ### 7. State Rank Weight
 
 The analysis incorporates both state-specific rankings and special handling for national polls to ensure a comprehensive and nuanced approach to poll weighting.
@@ -344,6 +343,7 @@ Where:
    - The `NATIONAL_POLL_WEIGHT` can be adjusted in the configuration to increase or decrease the impact of national polls.
 
 **Justification**:
+
 - National polls provide a broad overview of the electoral landscape but may not capture state-specific nuances.
 - This approach allows for balancing the insights from national polls with the more granular information provided by state polls.
 - The configurable weight enables analysts to adjust the relative importance of national polls based on their assessment of poll reliability and relevance.
@@ -369,7 +369,7 @@ Where:
 - **Data Handling**: The `states.py` script ensures that if forecast data is missing or incomplete, default values are used to maintain computational integrity.
 - **Weight Sensitivity**: The weighting percentages and multipliers can be adjusted to emphasize different components based on analytical needs or to reflect changing dynamics in the election landscape.
 
-By incorporating both state-specific rankings and special handling for national polls, this approach provides a comprehensive framework for weighting different types of polls, ensuring that both state-level dynamics and national
+By incorporating both state-specific rankings and special handling for national polls, this approach provides a comprehensive framework for weighting different types of polls, ensuring that both state-level dynamics and national trends are appropriately represented in the analysis.
 
 ### 8. Combining Weights
 
@@ -467,7 +467,7 @@ If `HEAVY_WEIGHT` is set to `True`, the combined weight for a poll would be the 
   $$
   \text{Margin of Error}_c = z \times \sqrt{\frac{p(1 - p)}{n_{\text{effective}}}} \times 100\%
   $$
-  
+
   - **\( p \)**: Proportion (Weighted Average divided by 100).
   - **\( z \)**: Z-score (default is 1.96 for 95% confidence).
 
@@ -490,12 +490,12 @@ For a candidate with the following polls:
   $$
   \text{Weighted Sum} = (0.8 \times 50) + (1.0 \times 55) + (0.6 \times 45) = 40 + 55 + 27 = 122
   $$
-  
+
 - **Total Weight**:
   $$
   \text{Total Weight} = 0.8 + 1.0 + 0.6 = 2.4
   $$
-  
+
 - **Weighted Average**:
   $$
   \text{Weighted Average} = \frac{122}{2.4} \approx 50.83\%
@@ -546,17 +546,17 @@ For a candidate with the following favorability polls:
   $$
   (0.9 \times 60) + (1.1 \times 55) + (0.7 \times 50) = 54 + 60.5 + 35 = 149.5
   $$
-  
+
 - **Weighted Unfavorable Sum**:
   $$
   (0.9 \times 30) + (1.1 \times 35) + (0.7 \times 40) = 27 + 38.5 + 28 = 93.5
   $$
-  
+
 - **Total Weight**:
   $$
   \text{Total Weight} = 0.9 + 1.1 + 0.7 = 2.7
   $$
-  
+
 - **Favorability Differential**:
   $$
   \text{Favorability Differential} = \frac{149.5 - 93.5}{2.7} \approx \frac{56}{2.7} \approx 20.74\%
@@ -565,6 +565,13 @@ For a candidate with the following favorability polls:
 **Output**:
 
 - **Favorability Differential**: +20.74%
+
+**Enhancements**:
+
+- **Net Favorability Score**: Incorporate both favorable and unfavorable responses to provide a net favorability score:
+  $$
+  \text{Net Favorability} = \frac{\text{Weighted Favorable} - \text{Weighted Unfavorable}}{\text{Total Weight}}
+  $$
 
 ### 11. Combining Polling Metrics and Favorability Differential
 
@@ -605,6 +612,10 @@ $$
 
 - **Combined Result**: 46.30%
 
+**Implementation Note**:
+
+- Ensure that both `polling_score` and `favorability` are on comparable scales before combining. If one metric inherently has a larger range or different distribution, consider normalizing them to prevent one from dominating the other.
+
 ### 12. Out-of-Bag (OOB) Variance Calculation
 
 **Objective**: To estimate the variance associated with the polling metrics using a Random Forest model.
@@ -623,7 +634,7 @@ $$
        N_TREES = 1000
        RANDOM_STATE = 42
        ```
-  
+
 - **OOB Variance**:
   $$
   \sigma_{\text{OOB}}^2 = \frac{1}{N} \sum_{i=1}^{N} \left( y_i - \hat{y}_i^{\text{OOB}} \right)^2
@@ -641,13 +652,17 @@ $$
 - **Data Preparation**:
   - Combine polling and favorability data into a single DataFrame.
   - Select relevant feature columns based on availability.
-  
+
+- **Target Variable (`y`)**:
+  - Use `'pct'` from polling data and `'favorable'` from favorability data as the target.
+  - Ensure that these metrics are comparable or consider handling them separately.
+
 - **Pipeline Execution**:
   - Implement a `Pipeline` that first imputes missing data and then fits the Random Forest model.
-  
+
 - **Variance Calculation**:
   - After fitting, extract the OOB predictions and calculate the variance between actual values and OOB predictions.
-  
+
 - **Error Handling**:
   - If feature columns are missing or data is insufficient, log appropriate warnings and return a default variance value.
 
@@ -674,6 +689,7 @@ $$
 **Implementation Note**:
 
 - The variance is reported as a single numerical value representing the average squared difference between actual and predicted values, providing insight into the model's prediction accuracy.
+- Ensure that the target variables are compatible when combining `'pct'` and `'favorable'`. If they represent different constructs, consider training separate models or standardizing them appropriately.
 
 ---
 

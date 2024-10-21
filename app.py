@@ -502,8 +502,12 @@ def main():
         else:
             st.warning("No favorability data available.")
 
-        st.header("Analysis Results")
+        st.header("Analysis Results (Table)")
         st.write(sufficient_data_df)
+
+        st.header("Analysis Results (JSON)")
+        st.json(sufficient_data_df.to_json(orient='records'))
+        
     else:
         st.error("No data available.")
 
@@ -516,6 +520,11 @@ def main():
                 st.write(f"- {row['period']}: {row['message']}")
     else:
         st.warning("Unable to retrieve results for periods with insufficient data.")
+
+
+    # Add logging to verify configuration
+    st.write("Current Configuration:")
+    st.json(config_vars)
 
     # Add download links for CSV files
     st.header("Download Raw Data")
