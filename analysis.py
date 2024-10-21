@@ -54,39 +54,44 @@ def download_csv_data(url: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 def preprocess_data(df: pd.DataFrame, invalid_pollsters: Set[str], start_period: Optional[pd.Timestamp] = None) -> pd.DataFrame:
-    """
-    Preprocess the data by filtering out invalid pollsters, converting date columns,
-    handling missing values, and calculating necessary weights.
-    """
     df = df.copy()
+    original_count = len(df)
+    logging.info(f"Starting with {original_count} polls")
 
     # Filter out invalid pollsters
-    original_count = len(df)
     if 'pollster' in df.columns:
         df['pollster_lower'] = df['pollster'].str.lower()
+        purged_polls = df[df['pollster_lower'].isin(invalid_pollsters)]
         df = df[~df['pollster_lower'].isin(invalid_pollsters)]
         df = df.drop(columns=['pollster_lower'])
-        filtered_count = len(df)
-        logging.info(f"Removed {original_count - filtered_count} polls from invalid pollsters.")
+        logging.info(f"Removed {len(purged_polls)} polls from invalid pollsters.")
+        logging.info(f"Pollsters removed: {', '.join(purged_polls['pollster'].unique())}")
+        logging.info(f"After removing invalid pollsters: {len(df)} polls")
     else:
         logging.warning("'pollster' column is missing. Skipping pollster purging.")
 
-    # Filter out polls without numeric_grade or pollscore
-    original_count = len(df)
+    # Log counts of missing data before filtering
+    for column in ['numeric_grade', 'pollscore', 'transparency_score']:
+        missing_count = df[column].isnull().sum()
+        logging.info(f"Polls with missing {column}: {missing_count}")
 
-    df['numeric_grade'] = df['numeric_grade'].fillna(config.ZERO_CORRECTION)
-    df['pollscore'] = df['pollscore'].fillna(config.ZERO_CORRECTION)
-    df = df[(df['numeric_grade'] != config.ZERO_CORRECTION) | (df['pollscore'] != config.ZERO_CORRECTION)]
-
-    filtered_count = len(df)
-    logging.info(f"Filtered out {original_count - filtered_count} polls without numeric_grade or pollscore")
+    # Filter out polls without numeric_grade, pollscore, or transparency_score
+    df_before_filter = df.copy()
+    df = df.dropna(subset=['numeric_grade', 'pollscore', 'transparency_score'])
+    removed_polls = len(df_before_filter) - len(df)
+    logging.info(f"Removed {removed_polls} polls with missing critical data.")
+    logging.info(f"After removing polls with missing critical data: {len(df)} polls")
 
     # Specify the date format based on your data
     date_format = '%m/%d/%y %H:%M'
     df['created_at'] = pd.to_datetime(df['created_at'], format=date_format, errors='coerce', utc=True)
     df = df.dropna(subset=['created_at'])
     if start_period is not None:
+        df_before_date_filter = df.copy()
         df = df[df['created_at'] >= start_period]
+        removed_date_polls = len(df_before_date_filter) - len(df)
+        logging.info(f"Removed {removed_date_polls} polls before the start period.")
+    logging.info(f"After date filtering: {len(df)} polls")
 
     # Standardize candidate names
     if 'candidate_name' in df.columns:
@@ -95,7 +100,7 @@ def preprocess_data(df: pd.DataFrame, invalid_pollsters: Set[str], start_period:
         df['politician'] = df['politician'].str.strip()
 
     # Normalize 'numeric_grade'
-    df['numeric_grade'] = pd.to_numeric(df['numeric_grade'], errors='coerce').fillna(0)
+    df['numeric_grade'] = pd.to_numeric(df['numeric_grade'], errors='coerce')
     max_numeric_grade = df['numeric_grade'].max()
     if max_numeric_grade != 0:
         df['normalized_numeric_grade'] = df['numeric_grade'] / max_numeric_grade
@@ -104,7 +109,7 @@ def preprocess_data(df: pd.DataFrame, invalid_pollsters: Set[str], start_period:
     df['normalized_numeric_grade'] = df['normalized_numeric_grade'].clip(0, 1)
 
     # Handle pollscore (lower is better, negative is best)
-    df['pollscore'] = pd.to_numeric(df['pollscore'], errors='coerce').fillna(0)
+    df['pollscore'] = pd.to_numeric(df['pollscore'], errors='coerce')
     max_pollscore = df['pollscore'].max()
     min_pollscore = df['pollscore'].min()
     
@@ -117,11 +122,8 @@ def preprocess_data(df: pd.DataFrame, invalid_pollsters: Set[str], start_period:
     # Clip to ensure all values are between 0 and 1
     df['normalized_pollscore'] = df['normalized_pollscore'].clip(0, 1)
 
-    logging.info(f"Normalized pollscores range from {df['normalized_pollscore'].min():.4f} to {df['normalized_pollscore'].max():.4f}")
-    logging.info(f"Best raw pollscore: {min_pollscore:.4f}, Worst raw pollscore: {max_pollscore:.4f}")
-
     # Normalize 'transparency_score'
-    df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce').fillna(0)
+    df['transparency_score'] = pd.to_numeric(df['transparency_score'], errors='coerce')
     max_transparency_score = df['transparency_score'].max()
     if max_transparency_score != 0:
         df['normalized_transparency_score'] = df['transparency_score'] / max_transparency_score
@@ -171,6 +173,8 @@ def preprocess_data(df: pd.DataFrame, invalid_pollsters: Set[str], start_period:
     df['population_weight'] *= config.POPULATION_WEIGHT_MULTIPLIER
     df['partisan_weight'] *= config.PARTISAN_WEIGHT_MULTIPLIER
     df['state_rank'] *= config.STATE_RANK_MULTIPLIER
+
+    logging.info(f"Final number of polls after all preprocessing: {len(df)}")
 
     return df
 
