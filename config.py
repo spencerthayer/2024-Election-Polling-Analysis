@@ -22,6 +22,9 @@ FAVORABILITY_WEIGHT = 0.1  # Adjust this value between 0 (no favorability influe
 # Flag to control weighting strategy (True for multiplicative, False for additive)
 HEAVY_WEIGHT = True  # Set to True to use multiplicative weighting, False for additive weighting
 
+# Set to True to remove pollsters who are trying to game the system
+PURGE_POLLS = False
+
 # Time decay parameters
 DECAY_RATE = 1.0     # Decay rate for time decay weighting (e.g., 0.5 for a slow 50% decay use 2 for a faster 200% decay)
 HALF_LIFE_DAYS = 14  # Half-life in days for time decay weighting

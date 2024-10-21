@@ -7,6 +7,7 @@ import pandas as pd
 import altair as alt
 from datetime import datetime
 from analysis import get_analysis_results
+from analysis import load_invalid_pollsters
 import config
 from config import *
 
@@ -135,7 +136,8 @@ def load_and_process_data(config_vars, force_refresh=False):
         for key, value in config_vars.items():
             setattr(config, key, value)
         
-        results_df = get_analysis_results()
+        invalid_pollsters = load_invalid_pollsters() if config.PURGE_POLLS else set()
+        results_df = get_analysis_results(invalid_pollsters)
         sufficient_data_df = preprocess_data(results_df)
         
         save_cached_data(sufficient_data_df)
@@ -360,6 +362,9 @@ def configuration_form():
             heavy_weight = st.checkbox("Heavy Weight", config.HEAVY_WEIGHT)
             st.markdown("<sup>Check for multiplicative, uncheck for additive.</sup>", unsafe_allow_html=True)
             
+            purge_polls = st.checkbox("Purge Polls", config.PURGE_POLLS)
+            st.markdown("<sup>Check to remove pollsters who are trying to game the system.</sup>", unsafe_allow_html=True)
+            
             st.subheader("Time Weight")
             half_life_days = st.number_input("Half Life in Days", 1, 365, int(config.HALF_LIFE_DAYS), 1)
             st.markdown("<sup>Time decay parameter that controls the influence of older polls.</sup>", unsafe_allow_html=True)
@@ -398,6 +403,7 @@ def configuration_form():
         return {
             "FAVORABILITY_WEIGHT": favorability_weight,
             "HEAVY_WEIGHT": heavy_weight,
+            "PURGE_POLLS": purge_polls,
             "DECAY_RATE": decay_rate,
             "HALF_LIFE_DAYS": half_life_days,
             "MIN_SAMPLES_REQUIRED": min_samples_required,

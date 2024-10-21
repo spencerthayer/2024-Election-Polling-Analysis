@@ -8,15 +8,31 @@ import logging
 from states import get_state_data
 from config import *
 from io import StringIO
-from typing import Dict, List, Tuple, Any, Optional, Callable, Union
+from typing import Dict, List, Tuple, Any, Optional, Callable, Union, Set
 from scipy.stats import norm
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer
+import json
 
 # Configure logging
 logging.basicConfig(level=config.LOGGING_LEVEL, format=config.LOGGING_FORMAT)
+
+def load_invalid_pollsters() -> Set[str]:
+    """
+    Load the list of invalid pollsters from purge.json.
+    """
+    try:
+        with open('purge.json', 'r') as file:
+            data = json.load(file)
+            return set(pollster.lower() for pollster in data.get('invalid', []))
+    except FileNotFoundError:
+        logging.warning("purge.json file not found. No pollsters will be purged.")
+        return set()
+    except json.JSONDecodeError:
+        logging.error("Error decoding purge.json. No pollsters will be purged.")
+        return set()
 
 def download_csv_data(url: str) -> pd.DataFrame:
     """
@@ -37,11 +53,23 @@ def download_csv_data(url: str) -> pd.DataFrame:
         logging.error(f"Unexpected error while downloading data from {url}: {e}")
         return pd.DataFrame()
 
-def preprocess_data(df: pd.DataFrame, start_period: Optional[pd.Timestamp] = None) -> pd.DataFrame:
+def preprocess_data(df: pd.DataFrame, invalid_pollsters: Set[str], start_period: Optional[pd.Timestamp] = None) -> pd.DataFrame:
     """
-    Preprocess the data by converting date columns, handling missing values, and calculating necessary weights.
+    Preprocess the data by filtering out invalid pollsters, converting date columns,
+    handling missing values, and calculating necessary weights.
     """
     df = df.copy()
+
+    # Filter out invalid pollsters
+    original_count = len(df)
+    if 'pollster' in df.columns:
+        df['pollster_lower'] = df['pollster'].str.lower()
+        df = df[~df['pollster_lower'].isin(invalid_pollsters)]
+        df = df.drop(columns=['pollster_lower'])
+        filtered_count = len(df)
+        logging.info(f"Removed {original_count - filtered_count} polls from invalid pollsters.")
+    else:
+        logging.warning("'pollster' column is missing. Skipping pollster purging.")
 
     # Filter out polls without numeric_grade or pollscore
     original_count = len(df)
@@ -447,12 +475,19 @@ def impute_data(X: np.ndarray) -> np.ndarray:
             X[:, col] = imputer.fit_transform(X[:, col].reshape(-1, 1)).ravel()
     return X
 
-def get_analysis_results() -> pd.DataFrame:
+def get_analysis_results(invalid_pollsters: Set[str]) -> pd.DataFrame:
     """
     Performs the full analysis and returns the results as a DataFrame.
+    
+    Args:
+        invalid_pollsters (Set[str]): Set of pollsters to be excluded from the analysis.
+                                      If PURGE_POLLS is False, this will be an empty set.
+
+    Returns:
+        pd.DataFrame: Results of the analysis
     """
-    polling_df, favorability_df = load_and_preprocess_data()
-    results = calculate_results_for_all_periods(polling_df, favorability_df)
+    polling_df, favorability_df = load_and_preprocess_data(invalid_pollsters)
+    results = calculate_results_for_all_periods(polling_df, favorability_df, invalid_pollsters)
     results_df = pd.DataFrame(results)
 
     # Ensure 'period' is a categorical variable with the specified order
@@ -461,7 +496,7 @@ def get_analysis_results() -> pd.DataFrame:
 
     return results_df
 
-def load_and_preprocess_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
+def load_and_preprocess_data(invalid_pollsters: Set[str]) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Loads and preprocesses polling and favorability data.
     """
@@ -471,14 +506,15 @@ def load_and_preprocess_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     logging.info(f"Polling data loaded with {polling_df.shape[0]} rows.")
     logging.info(f"Favorability data loaded with {favorability_df.shape[0]} rows.")
 
-    polling_df = preprocess_data(polling_df)
-    favorability_df = preprocess_data(favorability_df)
+    polling_df = preprocess_data(polling_df, invalid_pollsters)
+    favorability_df = preprocess_data(favorability_df, invalid_pollsters)
 
     return polling_df, favorability_df
 
 def calculate_results_for_all_periods(
     polling_df: pd.DataFrame,
-    favorability_df: pd.DataFrame
+    favorability_df: pd.DataFrame,
+    invalid_pollsters: Set[str]
 ) -> List[Dict[str, Any]]:
     """
     Calculates results for all predefined periods.
@@ -488,7 +524,7 @@ def calculate_results_for_all_periods(
 
     for period_value, period_type in periods:
         period_result = calculate_results_for_period(
-            polling_df, favorability_df, period_value, period_type
+            polling_df, favorability_df, period_value, period_type, invalid_pollsters
         )
         results.append(period_result)
 
@@ -498,7 +534,8 @@ def calculate_results_for_period(
     polling_df: pd.DataFrame,
     favorability_df: pd.DataFrame,
     period_value: int,
-    period_type: str
+    period_type: str,
+    invalid_pollsters: Set[str]
 ) -> Dict[str, Any]:
     """
     Calculate metrics and OOB variance for a single period.
@@ -511,12 +548,14 @@ def calculate_results_for_period(
 
     filtered_polling_df = polling_df[
         (polling_df['created_at'] >= start_period) &
-        (polling_df['candidate_name'].isin(config.CANDIDATE_NAMES))
+        (polling_df['candidate_name'].isin(config.CANDIDATE_NAMES)) &
+        (~polling_df['pollster'].str.lower().isin(invalid_pollsters))
     ].copy()
 
     filtered_favorability_df = favorability_df[
         (favorability_df['created_at'] >= start_period) &
-        (favorability_df['politician'].isin(config.CANDIDATE_NAMES))
+        (favorability_df['politician'].isin(config.CANDIDATE_NAMES)) &
+        (~favorability_df['pollster'].str.lower().isin(invalid_pollsters))
     ].copy()
 
     print(f"\n--- Period: {period_value} {period_type} ---")
@@ -627,7 +666,8 @@ def main():
     """
     Main function to perform analysis and output results.
     """
-    results_df = get_analysis_results()
+    invalid_pollsters = load_invalid_pollsters()
+    results_df = get_analysis_results(invalid_pollsters)
     for _, row in results_df.iterrows():
         output_results(row)
 
