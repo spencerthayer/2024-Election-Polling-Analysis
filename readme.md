@@ -9,12 +9,15 @@ This Python project is designed to fetch, process, and analyze presidential poll
 
 The project leverages data from [FiveThirtyEight](https://projects.fivethirtyeight.com/)'s publicly available CSV files for both [presidential polls](https://projects.fivethirtyeight.com/polls/data/president_polls.csv) and [favorability polls](https://projects.fivethirtyeight.com/polls/data/favorability_polls.csv). By applying a series of weightings to adjust for various factors—such as poll quality, partisanship, sample population type, and state significance—the analysis aims to produce an adjusted polling metric that more accurately reflects the true state of the presidential race.
 
+Additionally, the project incorporates a mechanism to purge polls from specified pollsters known to potentially bias polling averages. This is managed through a `purge.json` file, allowing for the exclusion of unreliable or partisan pollsters from the analysis.
+
 ---
 
 ## Table of Contents
 
 - [File Structure](#file-structure)
 - [Data Acquisition](#data-acquisition)
+- [Poll Purging Mechanism](#poll-purging-mechanism)
 - [Weighting Calculations](#weighting-calculations)
   - [1. Time Decay Weight](#1-time-decay-weight)
   - [2. Grade Weight](#2-grade-weight)
@@ -23,6 +26,8 @@ The project leverages data from [FiveThirtyEight](https://projects.fivethirtyeig
   - [5. Partisan Weight](#5-partisan-weight)
   - [6. Population Weight](#6-population-weight)
   - [7. State Rank Weight](#7-state-rank-weight)
+    - [7.1. State Rank Calculation](#71-state-rank-calculation)
+    - [7.2. National Poll Handling](#72-national-poll-handling)
   - [8. Combining Weights](#8-combining-weights)
   - [9. Calculating Polling Metrics](#9-calculating-polling-metrics)
   - [10. Calculating Favorability Differential](#10-calculating-favorability-differential)
@@ -43,6 +48,7 @@ The project leverages data from [FiveThirtyEight](https://projects.fivethirtyeig
 ├── analysis.py
 ├── app.py
 ├── config.py
+├── purge.json
 ├── readme.md
 ├── requirements.txt
 ├── states.py
@@ -52,6 +58,7 @@ The project leverages data from [FiveThirtyEight](https://projects.fivethirtyeig
 - **`analysis.py`**: Core script for fetching and analyzing polling data.
 - **`app.py`**: Streamlit application providing an interactive user interface.
 - **`config.py`**: Configuration file containing adjustable parameters.
+- **`purge.json`**: JSON file listing pollsters to be excluded from the analysis.
 - **`states.py`**: Script for scraping state-specific electoral data.
 - **`readme.md`**: Comprehensive project documentation.
 - **`requirements.txt`**: List of Python dependencies.
@@ -84,6 +91,92 @@ The project relies on three primary data sources to ensure a robust and comprehe
 
 - **FiveThirtyEight**: Renowned for its rigorous methodology and comprehensive data, making it a reliable source for polling and forecast information.
 - **270 To Win**: Provides up-to-date and detailed electoral data, essential for state-level analysis.
+
+---
+
+## Poll Purging Mechanism
+
+To ensure the integrity of the polling analysis, the project incorporates a **Poll Purging Mechanism**. This feature allows the exclusion of polls from specified pollsters known to potentially bias polling averages. The mechanism is managed through a `purge.json` file and a corresponding configuration option in the Streamlit app.
+
+### **1. `purge.json` File**
+
+- **Purpose**: Lists pollsters and sponsoring organizations whose polls should be excluded from the analysis to prevent manipulation of polling averages.
+  
+- **Structure**:
+  
+  ```json
+  {
+    "invalid": [
+      "American Greatness",
+      "American Pulse Research and Polling",
+      "Bullfinch",
+      "Daily Mail",
+      "co/efficent",
+      "Cygnal",
+      "Echelon",
+      "Emerson",
+      "Fabrizio",
+      "Fox News",
+      "Hunt Research",
+      "Insider Advantage",
+      "J.L. Partners",
+      "McLaughlin",
+      "Mitchell Communications",
+      "Napolitan Institute",
+      "Noble Predictive",
+      "On Message",
+      "Orbital Digital",
+      "Public Opinion Strategies",
+      "Quantus",
+      "Rasmussen",
+      "Redfield & Wilton",
+      "Remington",
+      "RMG",
+      "SoCal Data",
+      "The Telegraph",
+      "TIPP",
+      "Trafalgar",
+      "Victory Insights",
+      "University of Austin",
+      "The Wall Street Journal"
+    ]
+  }
+  ```
+  
+- **Implementation**:
+  - Located in the root directory of the project alongside `analysis.py` and `app.py`.
+  - The `analysis.py` script reads this file to identify and exclude specified pollsters from the analysis.
+
+### **2. Configuration in Streamlit App**
+
+- **Feature**: A checkbox labeled "Purge Polls" in the configuration sidebar of the Streamlit app.
+  
+- **Functionality**:
+  - **Checked**: Activates the Poll Purging Mechanism, excluding all pollsters listed in `purge.json` from the analysis.
+  - **Unchecked**: Includes all pollsters in the analysis, regardless of their presence in `purge.json`.
+
+- **User Guidance**:
+  - **Description**: "Check to remove pollsters who are trying to game the system."
+  - **Tooltip**: Provides additional context about the purpose of purging polls.
+
+### **3. Logging and Feedback**
+
+- **Implementation**:
+  - When poll purging is activated, the app logs the number of polls removed due to exclusion of invalid pollsters.
+  - Provides real-time feedback to the user indicating the activation of poll purging and the impact on data processing.
+
+- **Example Feedback**:
+  
+  ```
+  Purging 31 pollsters from the analysis.
+  Removed 70 polls from invalid pollsters.
+  ```
+
+### **4. Rationale**
+
+- **Preventing Bias**: Excluding polls from known partisan or unreliable pollsters ensures that the polling averages reflect a more accurate and unbiased picture of the electoral landscape.
+  
+- **Maintaining Integrity**: By allowing users to control the inclusion or exclusion of specific pollsters, the analysis remains transparent and adaptable to evolving polling dynamics.
 
 ---
 
@@ -275,7 +368,7 @@ PARTISAN_WEIGHT = {True: 0.01, False: 1.0}
 
 The analysis incorporates both state-specific rankings and special handling for national polls to ensure a comprehensive and nuanced approach to poll weighting.
 
-#### 7.1 State Rank Weight
+#### 7.1. State Rank Calculation
 
 **Objective**: To calculate a weight for each state poll based on the state's electoral importance, partisan classification, and current election forecasts, thereby prioritizing polls from significant and competitive states.
 
@@ -306,20 +399,30 @@ Where:
 
 2. **Normalized Electoral Votes (30% of State Rank)**:
    - Calculated as:
+
      $$
      \text{Normalized Electoral Votes} = \frac{\text{State's Electoral Votes}}{538}
      $$
+
    - **Justification**: Gives more weight to states with more electoral votes, reflecting their greater potential impact on the election outcome.
 
 3. **Forecast Weight (30% of State Rank)**:
    - Calculated as:
+
      $$
      \text{Forecast Weight} = 1 - \left( \frac{|\text{Forecast Median}|}{100} \right)
      $$
+
      - **Forecast Median**: The median forecasted margin between the candidates from FiveThirtyEight's data.
+
    - **Justification**: Prioritizes states with closer races, as they are more likely to influence the election outcome.
 
-#### 7.2 National Poll Handling
+**Implementation Details**:
+
+- The `states.py` script ensures that state data is up-to-date and accurately reflects current political dynamics.
+- The `STATE_RANK_MULTIPLIER` in `config.py` allows for adjusting the influence of state rankings in the combined weight calculation.
+
+#### 7.2. National Poll Handling
 
 **Objective**: To appropriately weight national polls in relation to state polls, recognizing their distinct nature and potential impact on the overall analysis.
 
@@ -327,20 +430,27 @@ Where:
 
 1. **Identification of National Polls**:
    - National polls are identified by the absence of state-specific information:
+
      ```python
      df['is_national'] = df['state'].isnull() | (df['state'] == '')
      ```
 
 2. **Special Weighting for National Polls**:
    - National polls receive an additional weight adjustment:
+
      ```python
      national_weight = config.NATIONAL_POLL_WEIGHT
      df.loc[df['is_national'], 'combined_weight'] *= national_weight
      ```
+
    - This allows for fine-tuning the influence of national polls relative to state polls in the overall analysis.
 
 3. **Configurable National Poll Weight**:
    - The `NATIONAL_POLL_WEIGHT` can be adjusted in the configuration to increase or decrease the impact of national polls.
+
+     ```python
+     NATIONAL_POLL_WEIGHT = 1.0  # Adjust to increase or decrease influence of national polls
+     ```
 
 **Justification**:
 
@@ -351,25 +461,10 @@ Where:
 **Implementation Details**:
 
 - The State Rank Weight is incorporated into the overall poll weighting as one of the factors in the combined weight calculation.
-- Its influence can be adjusted using the `STATE_RANK_MULTIPLIER` in `config.py`:
+- Its influence can be adjusted using the `STATE_RANK_MULTIPLIER` in `config.py`.
+- National polls are handled separately, and their weight can be adjusted using `NATIONAL_POLL_WEIGHT`.
 
-  ```python
-  STATE_RANK_MULTIPLIER = 1.0  # Adjust to increase or decrease influence
-  ```
-
-- National polls are handled separately and their weight can be adjusted using `NATIONAL_POLL_WEIGHT` in `config.py`:
-
-  ```python
-  NATIONAL_POLL_WEIGHT = 1.0  # Adjust to increase or decrease influence of national polls
-  ```
-
-**Considerations**:
-
-- **Dynamic Political Landscape**: The state's `pro_status` and forecast data are regularly updated to reflect the most current information.
-- **Data Handling**: The `states.py` script ensures that if forecast data is missing or incomplete, default values are used to maintain computational integrity.
-- **Weight Sensitivity**: The weighting percentages and multipliers can be adjusted to emphasize different components based on analytical needs or to reflect changing dynamics in the election landscape.
-
-By incorporating both state-specific rankings and special handling for national polls, this approach provides a comprehensive framework for weighting different types of polls, ensuring that both state-level dynamics and national trends are appropriately represented in the analysis.
+---
 
 ### 8. Combining Weights
 
@@ -569,9 +664,14 @@ For a candidate with the following favorability polls:
 **Enhancements**:
 
 - **Net Favorability Score**: Incorporate both favorable and unfavorable responses to provide a net favorability score:
+
   $$
   \text{Net Favorability} = \frac{\text{Weighted Favorable} - \text{Weighted Unfavorable}}{\text{Total Weight}}
   $$
+
+**Implementation Note**:
+
+- Ensure that both `favorable` and `unfavorable` are on comparable scales before combining. If one metric inherently has a larger range or different distribution, consider normalizing them to prevent one from dominating the other.
 
 ### 11. Combining Polling Metrics and Favorability Differential
 
@@ -636,9 +736,11 @@ $$
        ```
 
 - **OOB Variance**:
+
   $$
   \sigma_{\text{OOB}}^2 = \frac{1}{N} \sum_{i=1}^{N} \left( y_i - \hat{y}_i^{\text{OOB}} \right)^2
   $$
+
   - **\( y_i \)**: Actual value.
   - **\( \hat{y}_i^{\text{OOB}} \)**: OOB prediction.
 
@@ -789,7 +891,7 @@ def load_and_process_data(config_vars, force_refresh=False):
         for key, value in config_vars.items():
             setattr(config, key, value)
         
-        results_df = get_analysis_results()
+        results_df = get_analysis_results(invalid_pollsters)
         sufficient_data_df = preprocess_data(results_df)
         
         save_cached_data(sufficient_data_df)
@@ -827,6 +929,7 @@ All configuration parameters are centralized in `config.py` and can be adjusted 
   POPULATION_WEIGHT_MULTIPLIER = 1.0
   PARTISAN_WEIGHT_MULTIPLIER = 1.0
   STATE_RANK_MULTIPLIER = 1.0
+  NATIONAL_POLL_WEIGHT = 1.0  # Adjust to increase or decrease influence of national polls
   ```
 
 - **Favorability Weight**:
@@ -878,7 +981,7 @@ All configuration parameters are centralized in `config.py` and can be adjusted 
 
 - **Via `config.py`**:
   - Directly edit the `config.py` file to set desired values.
-  
+
 - **Via Streamlit App**:
   - The Streamlit interface provides sliders and input fields to adjust configuration parameters dynamically.
   - Changes made through the app are saved and cached, ensuring consistency across sessions.
@@ -892,6 +995,7 @@ def configuration_form():
         with st.form("config_form"):
             favorability_weight = st.slider("Favorability Weight", 0.01, 1.0, float(config.FAVORABILITY_WEIGHT), 0.01)
             heavy_weight = st.checkbox("Heavy Weight", config.HEAVY_WEIGHT)
+            purge_polls = st.checkbox("Purge Polls", config.PURGE_POLLS)
             # ... (additional configuration inputs)
             submitted = st.form_submit_button("Apply Changes and Run Analysis")
 
@@ -899,6 +1003,7 @@ def configuration_form():
         return {
             "FAVORABILITY_WEIGHT": favorability_weight,
             "HEAVY_WEIGHT": heavy_weight,
+            "PURGE_POLLS": purge_polls,
             # ... (additional configuration parameters)
         }
     return None
@@ -913,12 +1018,13 @@ def configuration_form():
 
 ## Conclusion
 
-By meticulously integrating multiple data sources and applying a comprehensive set of weighting factors—including the enhanced State Rank Weight that incorporates current forecasts—this project offers a detailed and accurate analysis of presidential polling data. The consideration of factors such as pollster quality, sample size, partisanship, population type, and state significance ensures that the adjusted poll results provide a realistic reflection of the electoral landscape.
+By meticulously integrating multiple data sources and applying a comprehensive set of weighting factors—including the enhanced State Rank Weight that incorporates current forecasts and the Poll Purging Mechanism to exclude unreliable pollsters—this project offers a detailed and accurate analysis of presidential polling data. The consideration of factors such as pollster quality, sample size, partisanship, population type, state significance, and the exclusion of biased pollsters ensures that the adjusted poll results provide a realistic reflection of the electoral landscape.
 
 **Key Strengths**:
 
 - **Robust Methodology**: The use of mathematical models and justifiable weighting mechanisms enhances the credibility of the analysis.
 - **Incorporation of Current Forecasts**: By integrating FiveThirtyEight's forecast data into the State Rank Weight, the model stays updated with the latest electoral dynamics.
+- **Poll Purging Mechanism**: Excluding polls from specified pollsters prevents manipulation of polling averages, ensuring unbiased results.
 - **Customizability**: Users can adjust parameters to explore different analytical perspectives or to align with specific research questions.
 - **Interactivity**: The Streamlit app provides a user-friendly interface, making the analysis accessible to a broader audience.
 
@@ -1012,14 +1118,44 @@ Ensure you have the following installed:
 1. **Clone the Repository**:
 
    ```bash
-   git clone https://github.com/yourusername/election-polling-analysis.git
-   cd election-polling-analysis
+   gh repo clone spencerthayer/2024-Election-Polling-Analysis
+   cd 2024-Election-Polling-Analysis
    ```
 
 2. **Install Dependencies**:
 
    ```bash
    pip install -r requirements.txt
+   ```
+
+### Setting Up `purge.json`
+
+1. **Create `purge.json`**:
+
+   - Place a `purge.json` file in the root directory of the project alongside `analysis.py` and `app.py`.
+   - The file should contain a list of pollsters to exclude from the analysis.
+
+2. **Example Structure**:
+
+   ```json
+   {
+     "invalid": [
+       "American Greatness",
+       "American Pulse Research and Polling",
+       "Bullfinch",
+       "Daily Mail",
+       "co/efficent",
+       "Cygnal",
+       "Echelon",
+       "Emerson",
+       "Fabrizio",
+       "Fox News",
+       ...
+       "Victory Insights",
+       "University of Austin",
+       "The Wall Street Journal"
+     ]
+   }
    ```
 
 ### Running the Analysis
@@ -1061,13 +1197,13 @@ Ensure you have the following installed:
   - Comprehensive details available in this `readme.md` file.
   
 - **Support**:
-  - For issues or feature requests, please open an issue on the [GitHub repository](https://github.com/yourusername/election-polling-analysis/issues).
+  - For issues or feature requests, please open an issue on the [GitHub repository](https://github.com/spencerthayer/2024-Election-Polling-Analysis/issues).
 
 ---
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](https://en.wikipedia.org/wiki/MIT_License).
 
 ---
 
