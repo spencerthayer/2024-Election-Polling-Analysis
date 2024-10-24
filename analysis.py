@@ -240,67 +240,134 @@ def calculate_timeframe_specific_moe(df: pd.DataFrame, candidate_names: List[str
                 moes.append(moe)
     return np.mean(moes) if moes else np.nan
 
+# POLLING CALCULATION
 def calculate_polling(df: pd.DataFrame, candidate_names: List[str]) -> Dict[str, Tuple[float, float]]:
     """
-    Calculate polling metrics for the specified candidate names.
+    Calculate polling metrics with improved outlier handling and state weighting.
     """
     df = df.copy()
-    # Ensure 'pct' is correctly interpreted as a percentage
+    
+    # Basic percentage normalization
     df['pct'] = df['pct'].apply(lambda x: x if x > 1 else x * 100)
 
-    # Apply partisan weight mapping here
-    df['partisan_weight'] = df['is_partisan'].map({
-        True: config.PARTISAN_WEIGHT[True],
-        False: config.PARTISAN_WEIGHT[False]
-    })
+    # Population weights with stronger differentiation
+    df['population'] = df['population'].fillna('all').str.lower()
+    pop_weights = {
+        'lv': 1.0,      # Increased from original
+        'rv': 0.6,      # Decreased to create bigger gap
+        'a': 0.3,       # Decreased more
+        'all': 0.1      # Lowest weight
+    }
+    df['population_weight'] = df['population'].map(lambda x: pop_weights.get(x, 0.1))
 
-    # Prepare the weights with multipliers
+    # Sample size weight - log scale with diminishing returns
+    max_sample = df['sample_size'].max()
+    df['sample_size_weight'] = (np.log1p(df['sample_size']) / np.log1p(max_sample)).clip(0.2, 1)
+
+    # Normalize numeric grade - lower is better, exponential scaling
+    max_grade = df['numeric_grade'].max()
+    min_grade = df['numeric_grade'].min()
+    if max_grade != min_grade:
+        df['normalized_numeric_grade'] = np.exp(-(df['numeric_grade'] - min_grade) / (max_grade - min_grade))
+    else:
+        df['normalized_numeric_grade'] = 1
+
+    # Enhanced pollscore normalization - negative is better
+    max_pollscore = df['pollscore'].max()
+    min_pollscore = df['pollscore'].min()
+    if max_pollscore != min_pollscore:
+        # Flip and exponentially scale
+        df['normalized_pollscore'] = np.exp(-(df['pollscore'] - min_pollscore) / (max_pollscore - min_pollscore))
+    else:
+        df['normalized_pollscore'] = 1
+
+    # Transparency with minimum threshold
+    max_transparency = df['transparency_score'].max()
+    if max_transparency > 0:
+        df['normalized_transparency_score'] = (df['transparency_score'] / max_transparency).clip(0.3, 1)
+    else:
+        df['normalized_transparency_score'] = 1
+
+    # Partisan handling
+    df['partisan'] = df['partisan'].fillna('False').astype(str).str.strip()
+    df['partisan_weight'] = df['partisan'].map({
+        'True': config.PARTISAN_WEIGHT[True],
+        'False': config.PARTISAN_WEIGHT[False]
+    }).fillna(config.PARTISAN_WEIGHT[False])
+
+    # Enhanced state weighting for battleground states
+    df['state_weight'] = df['state_rank'].fillna(0.5)  # Default to 0.5 for missing
+    # Increase weight for likely battleground states
+    battleground_states = ['AZ', 'GA', 'MI', 'NV', 'PA', 'WI']
+    df.loc[df['state'].isin(battleground_states), 'state_weight'] *= 1.5
+    
+    # Outlier detection and penalization
+    for candidate in candidate_names:
+        candidate_mask = df['candidate_name'] == candidate
+        if candidate_mask.any():
+            pcts = df.loc[candidate_mask, 'pct']
+            median = pcts.median()
+            mad = np.median(np.abs(pcts - median))
+            z_scores = 0.6745 * (pcts - median) / mad
+            df.loc[candidate_mask, 'outlier_penalty'] = 1 / (1 + np.abs(z_scores))
+    df['outlier_penalty'] = df['outlier_penalty'].fillna(1)
+
+    # Prepare final weights with updated components
     weight_components = {
-        'time_decay': df['time_decay_weight'] * config.TIME_DECAY_WEIGHT_MULTIPLIER,
         'sample_size': df['sample_size_weight'] * config.SAMPLE_SIZE_WEIGHT_MULTIPLIER,
         'numeric_grade': df['normalized_numeric_grade'] * config.NORMALIZED_NUMERIC_GRADE_MULTIPLIER,
         'pollscore': df['normalized_pollscore'] * config.NORMALIZED_POLLSCORE_MULTIPLIER,
         'transparency': df['normalized_transparency_score'] * config.NORMALIZED_TRANSPARENCY_SCORE_MULTIPLIER,
         'population': df['population_weight'] * config.POPULATION_WEIGHT_MULTIPLIER,
         'partisan': df['partisan_weight'] * config.PARTISAN_WEIGHT_MULTIPLIER,
-        'state_rank': df['state_rank'] * config.STATE_RANK_MULTIPLIER,
+        'state': df['state_weight'] * config.STATE_RANK_MULTIPLIER,
+        'outlier': df['outlier_penalty']
     }
 
-    # Normalize weights after applying multipliers
+    # Normalize and combine weights
     for component in weight_components:
         max_val = weight_components[component].max()
-        if max_val != 0:
+        if max_val > 0:
             weight_components[component] = weight_components[component] / max_val
-        else:
-            weight_components[component] = config.ZERO_CORRECTION
+        weight_components[component] = weight_components[component].clip(0.1, 1)
 
-    if config.HEAVY_WEIGHT:
-        df['combined_weight'] = np.prod([weight_components[comp] for comp in weight_components], axis=0)
-    else:
-        df['combined_weight'] = np.mean([weight_components[comp] for comp in weight_components], axis=0)
+    # Calculate combined weight using geometric mean
+    log_weights = np.array([np.log(weight_components[comp]) for comp in weight_components])
+    df['combined_weight'] = np.exp(np.mean(log_weights, axis=0))
 
-    # Handle national polls
+    # National poll adjustment
     df['is_national'] = df['state'].isnull() | (df['state'] == '')
-    df.loc[df['is_national'], 'combined_weight'] *= config.NATIONAL_POLL_WEIGHT
+    df.loc[df['is_national'], 'combined_weight'] *= 0.85  # Reduce national poll impact
 
-    # Normalize combined_weight
-    if df['combined_weight'].max() != 0:
-        df['combined_weight'] = df['combined_weight'] / df['combined_weight'].max()
-    else:
-        df['combined_weight'] = 0
+    # Final weight normalization
+    max_weight = df['combined_weight'].max()
+    if max_weight > 0:
+        df['combined_weight'] = df['combined_weight'] / max_weight
+    df['combined_weight'] = df['combined_weight'].clip(0.1, 1)
 
     results = {}
     for candidate in candidate_names:
         candidate_df = df[df['candidate_name'] == candidate]
         
-        weighted_sum = (candidate_df['combined_weight'] * candidate_df['pct']).sum()
+        if candidate_df.empty:
+            results[candidate] = (0, 0)
+            continue
+        
+        # Weighted calculations
+        weighted_sum = (candidate_df['pct'] * candidate_df['combined_weight']).sum()
         total_weight = candidate_df['combined_weight'].sum()
         
-        weighted_average = weighted_sum / total_weight if total_weight > 0 else 0
+        if total_weight > 0:
+            weighted_average = weighted_sum / total_weight
+        else:
+            weighted_average = 0
+            
+        # Calculate margin of error
         moe = calculate_timeframe_specific_moe(candidate_df, [candidate])
         
         results[candidate] = (weighted_average, moe)
         
+        # Debug logging
         print(f"\nDetailed calculations for {candidate}:")
         print(f"  Total polls: {len(candidate_df)}")
         print("  Weight components (mean values):")
@@ -312,47 +379,105 @@ def calculate_polling(df: pd.DataFrame, candidate_names: List[str]) -> Dict[str,
         print(f"  Weighted average: {weighted_average:.2f}%")
         print(f"  Margin of Error: ±{moe:.2f}%")
         print(f"  National polls: {candidate_df['is_national'].sum()}")
+        
+        # Poll-by-poll details
+        print("\nPoll-by-poll details:")
+        for _, row in candidate_df.iterrows():
+            print(f"Poll ID: {row['poll_id']}")
+            print(f"Population: {row['population']}")
+            print(f"Sample size: {row['sample_size']}")
+            print(f"Numeric grade: {row['numeric_grade']}")
+            print(f"Pollscore: {row['pollscore']}")
+            print(f"Transparency: {row['transparency_score']}")
+            print(f"Weight: {row['combined_weight']:.4f}")
+            print(f"Percentage: {row['pct']:.1f}%")
+            print(f"Contribution: {(row['pct'] * row['combined_weight']):.4f}")
 
     return results
 
+# FAVORABILITY CALCULATION HERE
 def calculate_favorability(df: pd.DataFrame, candidate_names: List[str]) -> Dict[str, float]:
     """
-    Calculate favorability differentials for the specified candidate names,
-    aligning more closely with polling metrics calculation.
+    Calculate favorability differentials for the specified candidate names.
+    Properly handles pollscore normalization and weight calculations.
+    
+    Args:
+        df (pd.DataFrame): DataFrame containing the raw poll data
+        candidate_names (List[str]): List of candidate names to analyze
+        
+    Returns:
+        Dict[str, float]: Dictionary mapping candidate names to their favorability scores
     """
     df = df.copy()
-    # Ensure 'favorable' and 'unfavorable' are correctly interpreted as percentages
+    
+    # Ensure favorable and unfavorable are correctly interpreted as percentages
     for col in ['favorable', 'unfavorable']:
         df[col] = df[col].apply(lambda x: x if x > 1 else x * 100)
 
-    # Apply partisan weight mapping
-    df['partisan_weight'] = df['is_partisan'].map({
-        True: config.PARTISAN_WEIGHT[True],
-        False: config.PARTISAN_WEIGHT[False]
-    })
+    # Apply partisan weight mapping with default
+    df['partisan'] = df['partisan'].fillna('False').astype(str).str.strip()
+    df['partisan_weight'] = df['partisan'].map({
+        'True': config.PARTISAN_WEIGHT[True],
+        'False': config.PARTISAN_WEIGHT[False]
+    }).fillna(config.PARTISAN_WEIGHT[False])
+
+    # Population weights with proper default
+    df['population'] = df['population'].fillna('all').str.lower()
+    df['population_weight'] = df['population'].map(
+        lambda x: config.POPULATION_WEIGHTS.get(x, config.POPULATION_WEIGHTS['all'])
+    )
+
+    # Sample size weight calculation
+    max_sample = df['sample_size'].max()
+    df['sample_size_weight'] = df['sample_size'] / max_sample if max_sample > 0 else 1
+
+    # Normalize numeric grade
+    max_grade = df['numeric_grade'].max()
+    df['normalized_numeric_grade'] = (df['numeric_grade'] / max_grade).fillna(1) if max_grade > 0 else 1
+
+    # Normalize pollscore correctly - higher scores should get higher weights
+    max_pollscore = df['pollscore'].max()
+    min_pollscore = df['pollscore'].min()
+    if max_pollscore != min_pollscore:
+        df['normalized_pollscore'] = (df['pollscore'] - min_pollscore) / (max_pollscore - min_pollscore)
+    else:
+        df['normalized_pollscore'] = 1
+
+    # Normalize transparency score
+    max_transparency = df['transparency_score'].max()
+    df['normalized_transparency_score'] = (df['transparency_score'] / max_transparency).fillna(1) if max_transparency > 0 else 1
+
+    # Ensure time decay weight exists
+    df['time_decay_weight'] = df.get('time_decay_weight', 1).fillna(1)
+
+    # Handle state rank
+    df['state_rank'] = df['state_rank'].fillna(1)
 
     # Prepare weights with multipliers
     weight_components = {
-        'time_decay': df.get('time_decay_weight', 1) * config.TIME_DECAY_WEIGHT_MULTIPLIER,
-        'sample_size': df.get('sample_size_weight', 1) * config.SAMPLE_SIZE_WEIGHT_MULTIPLIER,
+        'time_decay': df['time_decay_weight'] * config.TIME_DECAY_WEIGHT_MULTIPLIER,
+        'sample_size': df['sample_size_weight'] * config.SAMPLE_SIZE_WEIGHT_MULTIPLIER,
         'numeric_grade': df['normalized_numeric_grade'] * config.NORMALIZED_NUMERIC_GRADE_MULTIPLIER,
         'pollscore': df['normalized_pollscore'] * config.NORMALIZED_POLLSCORE_MULTIPLIER,
         'transparency': df['normalized_transparency_score'] * config.NORMALIZED_TRANSPARENCY_SCORE_MULTIPLIER,
-        'population': df.get('population_weight', 1) * config.POPULATION_WEIGHT_MULTIPLIER,
+        'population': df['population_weight'] * config.POPULATION_WEIGHT_MULTIPLIER,
         'partisan': df['partisan_weight'] * config.PARTISAN_WEIGHT_MULTIPLIER,
-        'state_rank': df['state_rank'] * config.STATE_RANK_MULTIPLIER,
+        'state_rank': df['state_rank'] * config.STATE_RANK_MULTIPLIER
     }
 
-    # Normalize weights after applying multipliers
+    # Normalize weights and ensure no zeros
     for component in weight_components:
         max_val = weight_components[component].max()
-        if max_val != 0:
+        if max_val > 0:
             weight_components[component] = weight_components[component] / max_val
-        else:
-            weight_components[component] = config.ZERO_CORRECTION
+        weight_components[component] = weight_components[component].clip(config.ZERO_CORRECTION, 1)
 
+    # Calculate combined weight
     if config.HEAVY_WEIGHT:
-        df['combined_weight'] = np.prod([weight_components[comp] for comp in weight_components], axis=0)
+        weights = [weight_components[comp] for comp in weight_components]
+        df['combined_weight'] = np.ones(len(df))
+        for w in weights:
+            df['combined_weight'] *= w.clip(config.ZERO_CORRECTION, 1)
     else:
         df['combined_weight'] = np.mean([weight_components[comp] for comp in weight_components], axis=0)
 
@@ -360,39 +485,42 @@ def calculate_favorability(df: pd.DataFrame, candidate_names: List[str]) -> Dict
     df['is_national'] = df['state'].isnull() | (df['state'] == '')
     df.loc[df['is_national'], 'combined_weight'] *= config.NATIONAL_POLL_WEIGHT
 
-    # Normalize combined_weight
-    if df['combined_weight'].max() != 0:
-        df['combined_weight'] = df['combined_weight'] / df['combined_weight'].max()
-    else:
-        df['combined_weight'] = 0
+    # Normalize final weights to [0,1] range
+    max_weight = df['combined_weight'].max()
+    if max_weight > 0:
+        df['combined_weight'] = df['combined_weight'] / max_weight
+    df['combined_weight'] = df['combined_weight'].clip(config.ZERO_CORRECTION, 1)
 
     results = {}
     for candidate in candidate_names:
         candidate_df = df[df['politician'] == candidate]
         
-        weighted_favorable = (candidate_df['combined_weight'] * candidate_df['favorable']).sum()
-        weighted_unfavorable = (candidate_df['combined_weight'] * candidate_df['unfavorable']).sum()
+        if candidate_df.empty:
+            results[candidate] = 0
+            continue
+            
+        # Calculate weighted average
+        weighted_sum = (candidate_df['favorable'] * candidate_df['combined_weight']).sum()
         total_weight = candidate_df['combined_weight'].sum()
         
-        if total_weight > 0:
-            favorability = (weighted_favorable / total_weight)
-        else:
-            favorability = 0
-        
+        favorability = weighted_sum / total_weight if total_weight > 0 else 0
         results[candidate] = favorability
         
+        # Debug logging
         print(f"\nDetailed favorability calculations for {candidate}:")
-        print(f"  Total polls: {len(candidate_df)}")
-        print("  Weight components (mean values):")
-        for component, values in weight_components.items():
-            mean_val = values[candidate_df.index].mean() if not candidate_df.empty else 0
-            print(f"    {component}: {mean_val:.4f}")
-        print(f"  National poll weight: {config.NATIONAL_POLL_WEIGHT:.4f}")
-        print(f"  Combined weight (sum): {total_weight:.4f}")
-        print(f"  Weighted favorable sum: {weighted_favorable:.4f}")
-        print(f"  Weighted unfavorable sum: {weighted_unfavorable:.4f}")
-        print(f"  Favorability: {favorability:.2f}%")
-        print(f"  National polls: {candidate_df['is_national'].sum()}")
+        for _, row in candidate_df.iterrows():
+            print(f"Poll ID: {row['poll_id']}")
+            print(f"Population: {row['population']}")
+            print(f"Sample size: {row['sample_size']}")
+            print(f"Numeric grade: {row['numeric_grade']}")
+            print(f"Pollscore: {row['pollscore']}")
+            print(f"Transparency: {row['transparency_score']}")
+            print(f"Weight: {row['combined_weight']:.4f}")
+            print(f"Favorable: {row['favorable']:.1f}%")
+            print(f"Contribution: {(row['favorable'] * row['combined_weight']):.4f}")
+        print(f"Total weight: {total_weight:.4f}")
+        print(f"Weighted sum: {weighted_sum:.4f}")
+        print(f"Final favorability: {favorability:.2f}%")
 
     return results
 
